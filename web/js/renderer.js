@@ -456,18 +456,24 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
       break;
     }
 
-    case "sleep_bubble": {
-      const bubblePhase = Math.floor(frame / 6) % 3;
-      const bubbleColor = "#d4eafc";
-      const bubbleHighlight = "#eaf4ff";
-      drawPixel(ctx, 8, 6 + bo, bubbleColor, scale);
-      if (bubblePhase >= 1) {
-        drawPixel(ctx, 7, 6 + bo, bubbleColor, scale);
-        drawPixel(ctx, 8, 5 + bo, bubbleHighlight, scale);
+    case "sleep_z": {
+      const zPhase = Math.floor(frame / 8) % 3;
+      const zColor = "#8e99a4";
+      const zBright = "#a8b4c0";
+      if (zPhase >= 0) {
+        drawPixel(ctx, 12, 2 + bo, zColor, scale);
       }
-      if (bubblePhase >= 2) {
-        drawPixel(ctx, 7, 5 + bo, bubbleColor, scale);
-        drawPixel(ctx, 9, 6 + bo, bubbleHighlight, scale);
+      if (zPhase >= 1) {
+        drawPixel(ctx, 13, 0 + bo, zBright, scale);
+        drawPixel(ctx, 14, 0 + bo, zBright, scale);
+        drawPixel(ctx, 13, 1 + bo, zBright, scale);
+      }
+      if (zPhase >= 2) {
+        drawPixel(ctx, 14, -2 + bo, zBright, scale);
+        drawPixel(ctx, 15, -2 + bo, zBright, scale);
+        drawPixel(ctx, 15, -1 + bo, zBright, scale);
+        drawPixel(ctx, 14, -1 + bo, zBright, scale);
+        drawPixel(ctx, 14, 0 + bo, zBright, scale);
       }
       break;
     }
@@ -475,7 +481,7 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
 }
 
 const ACTION_ACCESSORIES = {
-  idle: ["sleep_bubble"],
+  idle: ["sleep_z"],
   thinking: ["thought_bubble"],
   coding: ["laptop"],
   reading: ["book"],
