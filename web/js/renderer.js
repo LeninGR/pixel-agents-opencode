@@ -91,8 +91,9 @@ function drawPixel(ctx, x, y, color, scale) {
   ctx.fillRect(x * scale, y * scale, scale, scale);
 }
 
-function drawBaseCharacter(ctx, palette, scale, frame) {
-  const breathOffset = frame % 2 === 0 ? 0 : -1;
+function drawBaseCharacter(ctx, palette, scale, frame, action) {
+  const isIdle = !action || action === "idle";
+  const breathOffset = isIdle ? 0 : (frame % 2 === 0 ? 0 : -1);
 
   const skinRows = [
     { y: 2 + breathOffset, pixels: [[5, 6, 7, 8, 9, 10]] },
@@ -368,11 +369,108 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
       }
       break;
     }
+
+    case "boulder": {
+      drawPixel(ctx, 1, 10 + bo, "#7f8c8d", scale);
+      drawPixel(ctx, 2, 10 + bo, "#6c757d", scale);
+      drawPixel(ctx, 1, 11 + bo, "#6c757d", scale);
+      drawPixel(ctx, 2, 9 + bo, "#7f8c8d", scale);
+      break;
+    }
+
+    case "laurel_wreath": {
+      drawPixel(ctx, 4, 1 + bo, "#27ae60", scale);
+      drawPixel(ctx, 5, 0 + bo, "#daa520", scale);
+      drawPixel(ctx, 10, 0 + bo, "#daa520", scale);
+      drawPixel(ctx, 11, 1 + bo, "#27ae60", scale);
+      break;
+    }
+
+    case "fire_aura": {
+      const fireFrame = frame % 4;
+      const auraColors = ["#ff6b35", "#ff8c00", "#ffd700"];
+      drawPixel(ctx, 2, 4 + bo, auraColors[fireFrame % 3], scale);
+      drawPixel(ctx, 3, 3 + bo, auraColors[(fireFrame + 1) % 3], scale);
+      drawPixel(ctx, 13, 4 + bo, auraColors[(fireFrame + 2) % 3], scale);
+      drawPixel(ctx, 12, 5 + bo, auraColors[fireFrame % 3], scale);
+      break;
+    }
+
+    case "explorer_hat": {
+      for (let x = 4; x <= 11; x++) {
+        drawPixel(ctx, x, 0 + bo, "#6d4c41", scale);
+      }
+      for (let x = 6; x <= 9; x++) {
+        drawPixel(ctx, x, 1 + bo, "#6d4c41", scale);
+      }
+      break;
+    }
+
+    case "owl": {
+      drawPixel(ctx, 1, 6 + bo, "#8B7355", scale);
+      drawPixel(ctx, 2, 6 + bo, "#8B7355", scale);
+      drawPixel(ctx, 1, 7 + bo, "#8B7355", scale);
+      drawPixel(ctx, 1, 5 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 2, 5 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 1, 4 + bo, "#8B7355", scale);
+      drawPixel(ctx, 2, 4 + bo, "#8B7355", scale);
+      break;
+    }
+
+    case "forge_apron": {
+      for (let y = 7; y <= 9; y++) {
+        drawPixel(ctx, 5, y + bo, "#8B4513", scale);
+        drawPixel(ctx, 10, y + bo, "#8B4513", scale);
+      }
+      drawPixel(ctx, 7, 6 + bo, "#8B4513", scale);
+      drawPixel(ctx, 8, 6 + bo, "#8B4513", scale);
+      break;
+    }
+
+    case "shoulder_globe": {
+      const globeColors = ["#3498db", "#27ae60"];
+      for (let x = 6; x <= 8; x++) {
+        for (let y = 0; y <= 2; y++) {
+          const colorIndex = (x + y + frame) % 2;
+          drawPixel(ctx, x, y + bo, globeColors[colorIndex], scale);
+        }
+      }
+      break;
+    }
+
+    case "comedy_mask": {
+      drawPixel(ctx, 13, 2 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 14, 2 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 13, 3 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 14, 3 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 13, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 14, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 13, 3 + bo, "#2c2c54", scale);
+      drawPixel(ctx, 13, 4 + bo, "#2c2c54", scale);
+      break;
+    }
+
+    case "zzz": {
+      const zPhase = Math.floor(frame / 4) % 3;
+      const zColor = "#8e99a4";
+      if (zPhase >= 0) {
+        drawPixel(ctx, 13, 3 + bo, zColor, scale);
+        drawPixel(ctx, 14, 2 + bo, zColor, scale);
+        drawPixel(ctx, 14, 3 + bo, zColor, scale);
+      }
+      if (zPhase >= 1) {
+        drawPixel(ctx, 14, 0 + bo, zColor, scale);
+        drawPixel(ctx, 15, 0 + bo, zColor, scale);
+        drawPixel(ctx, 15, 1 + bo, zColor, scale);
+        drawPixel(ctx, 14, 1 + bo, zColor, scale);
+      }
+      break;
+    }
   }
 }
 
 const ACTION_ACCESSORIES = {
-  idle: [],
+  idle: ["zzz"],
   thinking: ["thought_bubble"],
   coding: ["laptop"],
   reading: ["book"],
@@ -385,15 +483,15 @@ const ACTION_ACCESSORIES = {
 };
 
 const AGENT_IDENTITY_ACCESSORIES = {
-  sisyphus: [],
-  oracle: ["glasses"],
+  sisyphus: ["boulder"],
+  oracle: ["glasses", "laurel_wreath"],
   librarian: ["glasses"],
-  explore: [],
-  prometheus: ["torch"],
-  metis: [],
-  momus: ["mask"],
-  atlas: ["globe"],
-  hephaestus: [],
+  explore: ["explorer_hat"],
+  prometheus: ["torch", "fire_aura"],
+  metis: ["owl"],
+  momus: ["mask", "comedy_mask"],
+  atlas: ["shoulder_globe"],
+  hephaestus: ["forge_apron"],
 };
 
 function drawAgent(ctx, agentName, action, frame, canvasSize) {
@@ -403,9 +501,10 @@ function drawAgent(ctx, agentName, action, frame, canvasSize) {
   ctx.clearRect(0, 0, canvasSize, canvasSize);
 
   const palette = getPalette(agentName);
-  const breathOffset = frame % 2 === 0 ? 0 : 0;
+  const isIdle = !action || action === "idle";
+  const breathOffset = isIdle ? 0 : (frame % 2 === 0 ? 0 : -1);
 
-  drawBaseCharacter(ctx, palette, scale, frame);
+  drawBaseCharacter(ctx, palette, scale, frame, action);
 
   const identityAccessories = AGENT_IDENTITY_ACCESSORIES[agentName] || [];
   for (const acc of identityAccessories) {
