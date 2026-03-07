@@ -5,7 +5,7 @@ import { PixelAgentsServer } from "./server.js"
 
 const DEFAULT_PORT = 3456
 
-export const PixelAgentsPlugin: Plugin = async (ctx) => {
+const PixelAgentsPlugin: Plugin = async (ctx) => {
   const stateManager = new StateManager()
   const server = new PixelAgentsServer(stateManager, {
     port: DEFAULT_PORT,
@@ -87,3 +87,5 @@ export const PixelAgentsPlugin: Plugin = async (ctx) => {
     },
   }
 }
+
+export default PixelAgentsPlugin
