@@ -116,15 +116,30 @@ function drawBaseCharacter(ctx, palette, scale, frame, action) {
     drawPixel(ctx, hp.x, hp.y, palette.hair, scale);
   }
 
-  if (!isIdle) {
-    drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
-    drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
+  drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
+  drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
 
-    const blinkFrame = frame % 30 === 0;
-    if (blinkFrame) {
-      drawPixel(ctx, 6, 4 + breathOffset, palette.skin, scale);
-      drawPixel(ctx, 9, 4 + breathOffset, palette.skin, scale);
+  const blinkFrame = frame % 30 === 0;
+  if (blinkFrame) {
+    drawPixel(ctx, 6, 4 + breathOffset, palette.skin, scale);
+    drawPixel(ctx, 9, 4 + breathOffset, palette.skin, scale);
+  }
+
+  const mouthColor = "#c4956a";
+  if (isIdle) {
+    const yawnCycle = Math.floor(frame / 6) % 5;
+    const yawnWidths = [1, 2, 3, 2, 1];
+    const w = yawnWidths[yawnCycle];
+    const mouthX = 8 - Math.floor(w / 2);
+    for (let i = 0; i < w; i++) {
+      drawPixel(ctx, mouthX + i, 6 + breathOffset, mouthColor, scale);
     }
+    if (w >= 3) {
+      drawPixel(ctx, mouthX, 5 + breathOffset, mouthColor, scale);
+      drawPixel(ctx, mouthX + w - 1, 5 + breathOffset, mouthColor, scale);
+    }
+  } else {
+    drawPixel(ctx, 8, 6 + breathOffset, mouthColor, scale);
   }
 
   const bodyY = 7 + breathOffset;
@@ -443,7 +458,6 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
     }
 
     case "comedy_mask": {
-      // Held in left hand — 3-wide mask at x=0-2
       drawPixel(ctx, 0, 2 + bo, "#f1c40f", scale);
       drawPixel(ctx, 1, 2 + bo, "#f1c40f", scale);
       drawPixel(ctx, 2, 2 + bo, "#f1c40f", scale);
@@ -455,33 +469,10 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
       drawPixel(ctx, 2, 4 + bo, "#f1c40f", scale);
       break;
     }
-
-    case "sleep_z": {
-      const zPhase = Math.floor(frame / 8) % 3;
-      const zColor = "#8e99a4";
-      const zBright = "#a8b4c0";
-      if (zPhase >= 0) {
-        drawPixel(ctx, 12, 2 + bo, zColor, scale);
-      }
-      if (zPhase >= 1) {
-        drawPixel(ctx, 13, 0 + bo, zBright, scale);
-        drawPixel(ctx, 14, 0 + bo, zBright, scale);
-        drawPixel(ctx, 13, 1 + bo, zBright, scale);
-      }
-      if (zPhase >= 2) {
-        drawPixel(ctx, 14, -2 + bo, zBright, scale);
-        drawPixel(ctx, 15, -2 + bo, zBright, scale);
-        drawPixel(ctx, 15, -1 + bo, zBright, scale);
-        drawPixel(ctx, 14, -1 + bo, zBright, scale);
-        drawPixel(ctx, 14, 0 + bo, zBright, scale);
-      }
-      break;
-    }
   }
 }
 
 const ACTION_ACCESSORIES = {
-  idle: ["sleep_z"],
   thinking: ["thought_bubble"],
   coding: ["laptop"],
   reading: ["book"],
