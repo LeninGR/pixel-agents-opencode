@@ -5,6 +5,12 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "dist/"
   ],
@@ -12,17 +18,27 @@
     "build": "tsup src/index.ts --format esm --dts --out-dir dist && cp -r web dist/web",
     "typecheck": "tsc --noEmit",
     "dev": "tsup src/index.ts --format esm --dts --out-dir dist --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run clean && bun run build"
   },
   "keywords": [
     "opencode",
-    "plugin",
+    "opencode-plugin",
     "pixel-art",
     "agents",
-    "visualization"
+    "visualization",
+    "oh-my-opencode"
   ],
   "author": "nichelia",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nichelia/pixel-agents-opencode.git"
+  },
+  "homepage": "https://github.com/nichelia/pixel-agents-opencode#readme",
+  "bugs": {
+    "url": "https://github.com/nichelia/pixel-agents-opencode/issues"
+  },
   "dependencies": {
     "@opencode-ai/plugin": "latest",
     "@opencode-ai/sdk": "latest"
