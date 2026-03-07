@@ -31,7 +31,12 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     })
   }
 
-  let currentAgent = "sisyphus"
+  // Track which agent is active in each session (sessionID -> agentName)
+  const sessionAgentMap = new Map<string, string>()
+
+  function getAgentForSession(sessionID: string): string {
+    return sessionAgentMap.get(sessionID) || "sisyphus"
+  }
 
   return {
     tool: {
@@ -52,38 +57,49 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
 
     event: async ({ event }) => {
       switch (event.type) {
-        case "session.idle":
-          stateManager.setAgentIdle(currentAgent)
+        case "session.idle": {
+          const agentName = getAgentForSession(event.properties.sessionID)
+          stateManager.setAgentIdle(agentName)
+          sessionAgentMap.delete(event.properties.sessionID)
           break
+        }
         case "session.created":
-          stateManager.setAgentAction(currentAgent, "thinking", "Starting session")
           break
       }
     },
 
-    "tool.execute.before": async ({ tool: toolName }, { args }) => {
+    "tool.execute.before": async ({ tool: toolName, sessionID }, { args }) => {
+      const agentName = getAgentForSession(sessionID)
       if (toolName === "task" || toolName === "call_omo_agent") {
         const agentType =
           (args as Record<string, unknown>).subagent_type as string | undefined
         if (agentType) {
           stateManager.setAgentAction(agentType, "thinking", "Spawned")
           stateManager.setAgentAction(
-            currentAgent,
+            agentName,
             "orchestrating",
             `Delegating to ${agentType}`,
           )
         }
       } else {
-        stateManager.handleToolStart(currentAgent, toolName)
+        stateManager.handleToolStart(agentName, toolName)
       }
     },
 
-    "tool.execute.after": async ({ tool: toolName }) => {
-      stateManager.handleToolEnd(currentAgent, toolName)
+    "tool.execute.after": async ({ tool: toolName, sessionID }) => {
+      const agentName = getAgentForSession(sessionID)
+      stateManager.handleToolEnd(agentName, toolName)
     },
 
-    "chat.message": async ({}, { message }) => {
-      stateManager.setAgentAction(currentAgent, "thinking", "Composing response")
+    "chat.message": async ({ sessionID, agent }, { message }) => {
+      const agentName = agent || getAgentForSession(sessionID)
+      sessionAgentMap.set(sessionID, agentName)
+      stateManager.setAgentAction(agentName, "thinking", "Composing response")
+    },
+
+    "chat.params": async ({ sessionID, agent }) => {
+      sessionAgentMap.set(sessionID, agent)
+      stateManager.setAgentAction(agent, "thinking", "Preparing request")
     },
   }
 }
