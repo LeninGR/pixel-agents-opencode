@@ -116,13 +116,20 @@ function drawBaseCharacter(ctx, palette, scale, frame, action) {
     drawPixel(ctx, hp.x, hp.y, palette.hair, scale);
   }
 
-  drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
-  drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
+  if (isIdle) {
+    drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
+    drawPixel(ctx, 7, 4 + breathOffset, palette.eye, scale);
+    drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
+    drawPixel(ctx, 10, 4 + breathOffset, palette.eye, scale);
+  } else {
+    drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
+    drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
 
-  const blinkFrame = frame % 30 === 0;
-  if (blinkFrame) {
-    drawPixel(ctx, 6, 4 + breathOffset, palette.skin, scale);
-    drawPixel(ctx, 9, 4 + breathOffset, palette.skin, scale);
+    const blinkFrame = frame % 30 === 0;
+    if (blinkFrame) {
+      drawPixel(ctx, 6, 4 + breathOffset, palette.skin, scale);
+      drawPixel(ctx, 9, 4 + breathOffset, palette.skin, scale);
+    }
   }
 
   const bodyY = 7 + breathOffset;
@@ -306,8 +313,8 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
     }
 
     case "mask": {
-      drawPixel(ctx, 5, 3 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 10, 3 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 4, 4 + bo, "#c0392b", scale);
+      drawPixel(ctx, 11, 4 + bo, "#c0392b", scale);
       break;
     }
 
@@ -388,11 +395,9 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
 
     case "fire_aura": {
       const fireFrame = frame % 4;
-      const auraColors = ["#ff6b35", "#ff8c00", "#ffd700"];
-      drawPixel(ctx, 2, 4 + bo, auraColors[fireFrame % 3], scale);
-      drawPixel(ctx, 3, 3 + bo, auraColors[(fireFrame + 1) % 3], scale);
-      drawPixel(ctx, 13, 4 + bo, auraColors[(fireFrame + 2) % 3], scale);
-      drawPixel(ctx, 12, 5 + bo, auraColors[fireFrame % 3], scale);
+      const auraColors = ["#b34a25", "#b36200", "#b39700"];
+      drawPixel(ctx, 3, 4 + bo, auraColors[fireFrame % 3], scale);
+      drawPixel(ctx, 3, 5 + bo, auraColors[(fireFrame + 1) % 3], scale);
       break;
     }
 
@@ -407,13 +412,15 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
     }
 
     case "owl": {
-      drawPixel(ctx, 1, 6 + bo, "#8B7355", scale);
-      drawPixel(ctx, 2, 6 + bo, "#8B7355", scale);
-      drawPixel(ctx, 1, 7 + bo, "#8B7355", scale);
-      drawPixel(ctx, 1, 5 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 2, 5 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 0, 3 + bo, "#8B7355", scale);
+      drawPixel(ctx, 2, 3 + bo, "#8B7355", scale);
+      drawPixel(ctx, 0, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 2, 4 + bo, "#f1c40f", scale);
       drawPixel(ctx, 1, 4 + bo, "#8B7355", scale);
-      drawPixel(ctx, 2, 4 + bo, "#8B7355", scale);
+      drawPixel(ctx, 0, 5 + bo, "#8B7355", scale);
+      drawPixel(ctx, 1, 5 + bo, "#A0896C", scale);
+      drawPixel(ctx, 2, 5 + bo, "#8B7355", scale);
+      drawPixel(ctx, 1, 6 + bo, "#8B7355", scale);
       break;
     }
 
@@ -429,40 +436,47 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
 
     case "shoulder_globe": {
       const globeColors = ["#3498db", "#27ae60"];
-      for (let x = 6; x <= 8; x++) {
-        for (let y = 0; y <= 2; y++) {
+      for (let x = 13; x <= 15; x++) {
+        for (let y = 6; y <= 8; y++) {
           const colorIndex = (x + y + frame) % 2;
           drawPixel(ctx, x, y + bo, globeColors[colorIndex], scale);
         }
       }
+      drawPixel(ctx, 14, 9 + bo, "#7f8c8d", scale);
       break;
     }
 
     case "comedy_mask": {
       drawPixel(ctx, 13, 2 + bo, "#f1c40f", scale);
       drawPixel(ctx, 14, 2 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 13, 3 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 14, 3 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 13, 4 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 14, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 15, 2 + bo, "#f1c40f", scale);
       drawPixel(ctx, 13, 3 + bo, "#2c2c54", scale);
-      drawPixel(ctx, 13, 4 + bo, "#2c2c54", scale);
+      drawPixel(ctx, 14, 3 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 15, 3 + bo, "#2c2c54", scale);
+      drawPixel(ctx, 13, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 14, 4 + bo, "#c0392b", scale);
+      drawPixel(ctx, 15, 4 + bo, "#f1c40f", scale);
       break;
     }
 
-    case "zzz": {
-      const zPhase = Math.floor(frame / 4) % 3;
-      const zColor = "#8e99a4";
-      if (zPhase >= 0) {
-        drawPixel(ctx, 13, 3 + bo, zColor, scale);
-        drawPixel(ctx, 14, 2 + bo, zColor, scale);
-        drawPixel(ctx, 14, 3 + bo, zColor, scale);
+    case "sleep_bubble": {
+      const bubblePhase = Math.floor(frame / 6) % 3;
+      const bubbleColor = "#d4eafc";
+      const bubbleHighlight = "#eaf4ff";
+      // Small bubble near nose (x=11, around y=5-6)
+      drawPixel(ctx, 12, 5 + bo, bubbleColor, scale);
+      if (bubblePhase >= 1) {
+        // Medium bubble — grows
+        drawPixel(ctx, 12, 6 + bo, bubbleColor, scale);
+        drawPixel(ctx, 13, 5 + bo, bubbleColor, scale);
+        drawPixel(ctx, 13, 6 + bo, bubbleHighlight, scale);
       }
-      if (zPhase >= 1) {
-        drawPixel(ctx, 14, 0 + bo, zColor, scale);
-        drawPixel(ctx, 15, 0 + bo, zColor, scale);
-        drawPixel(ctx, 15, 1 + bo, zColor, scale);
-        drawPixel(ctx, 14, 1 + bo, zColor, scale);
+      if (bubblePhase >= 2) {
+        // Large bubble — full
+        drawPixel(ctx, 12, 4 + bo, bubbleColor, scale);
+        drawPixel(ctx, 13, 4 + bo, bubbleColor, scale);
+        drawPixel(ctx, 14, 5 + bo, bubbleColor, scale);
+        drawPixel(ctx, 14, 6 + bo, bubbleHighlight, scale);
       }
       break;
     }
@@ -470,7 +484,7 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
 }
 
 const ACTION_ACCESSORIES = {
-  idle: ["zzz"],
+  idle: ["sleep_bubble"],
   thinking: ["thought_bubble"],
   coding: ["laptop"],
   reading: ["book"],
