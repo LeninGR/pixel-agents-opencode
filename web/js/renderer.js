@@ -116,12 +116,7 @@ function drawBaseCharacter(ctx, palette, scale, frame, action) {
     drawPixel(ctx, hp.x, hp.y, palette.hair, scale);
   }
 
-  if (isIdle) {
-    drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
-    drawPixel(ctx, 7, 4 + breathOffset, palette.eye, scale);
-    drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
-    drawPixel(ctx, 10, 4 + breathOffset, palette.eye, scale);
-  } else {
+  if (!isIdle) {
     drawPixel(ctx, 6, 4 + breathOffset, palette.eye, scale);
     drawPixel(ctx, 9, 4 + breathOffset, palette.eye, scale);
 
@@ -435,27 +430,29 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
     }
 
     case "shoulder_globe": {
+      // Held in left hand — globe at x=0-2, stand at x=1
       const globeColors = ["#3498db", "#27ae60"];
-      for (let x = 13; x <= 15; x++) {
+      for (let x = 0; x <= 2; x++) {
         for (let y = 6; y <= 8; y++) {
           const colorIndex = (x + y + frame) % 2;
           drawPixel(ctx, x, y + bo, globeColors[colorIndex], scale);
         }
       }
-      drawPixel(ctx, 14, 9 + bo, "#7f8c8d", scale);
+      drawPixel(ctx, 1, 9 + bo, "#7f8c8d", scale);
       break;
     }
 
     case "comedy_mask": {
-      drawPixel(ctx, 13, 2 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 14, 2 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 15, 2 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 13, 3 + bo, "#2c2c54", scale);
-      drawPixel(ctx, 14, 3 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 15, 3 + bo, "#2c2c54", scale);
-      drawPixel(ctx, 13, 4 + bo, "#f1c40f", scale);
-      drawPixel(ctx, 14, 4 + bo, "#c0392b", scale);
-      drawPixel(ctx, 15, 4 + bo, "#f1c40f", scale);
+      // Held in left hand — 3-wide mask at x=0-2
+      drawPixel(ctx, 0, 2 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 1, 2 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 2, 2 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 0, 3 + bo, "#2c2c54", scale);
+      drawPixel(ctx, 1, 3 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 2, 3 + bo, "#2c2c54", scale);
+      drawPixel(ctx, 0, 4 + bo, "#f1c40f", scale);
+      drawPixel(ctx, 1, 4 + bo, "#c0392b", scale);
+      drawPixel(ctx, 2, 4 + bo, "#f1c40f", scale);
       break;
     }
 
@@ -463,20 +460,14 @@ function drawAccessory(ctx, accessoryType, palette, scale, frame, breathOffset) 
       const bubblePhase = Math.floor(frame / 6) % 3;
       const bubbleColor = "#d4eafc";
       const bubbleHighlight = "#eaf4ff";
-      // Small bubble near nose (x=11, around y=5-6)
-      drawPixel(ctx, 12, 5 + bo, bubbleColor, scale);
+      drawPixel(ctx, 8, 6 + bo, bubbleColor, scale);
       if (bubblePhase >= 1) {
-        // Medium bubble — grows
-        drawPixel(ctx, 12, 6 + bo, bubbleColor, scale);
-        drawPixel(ctx, 13, 5 + bo, bubbleColor, scale);
-        drawPixel(ctx, 13, 6 + bo, bubbleHighlight, scale);
+        drawPixel(ctx, 7, 6 + bo, bubbleColor, scale);
+        drawPixel(ctx, 8, 5 + bo, bubbleHighlight, scale);
       }
       if (bubblePhase >= 2) {
-        // Large bubble — full
-        drawPixel(ctx, 12, 4 + bo, bubbleColor, scale);
-        drawPixel(ctx, 13, 4 + bo, bubbleColor, scale);
-        drawPixel(ctx, 14, 5 + bo, bubbleColor, scale);
-        drawPixel(ctx, 14, 6 + bo, bubbleHighlight, scale);
+        drawPixel(ctx, 7, 5 + bo, bubbleColor, scale);
+        drawPixel(ctx, 9, 6 + bo, bubbleHighlight, scale);
       }
       break;
     }

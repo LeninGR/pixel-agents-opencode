@@ -130,7 +130,7 @@
           frame++;
           for (const { canvas, name } of canvases) {
             const ctx = canvas.getContext("2d");
-            window.PixelRenderer.drawAgent(ctx, name, "idle", frame, canvas.width);
+            window.PixelRenderer.drawAgent(ctx, name, "standing", frame, canvas.width);
           }
         }
         requestAnimationFrame(loop);
