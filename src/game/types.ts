@@ -104,7 +104,7 @@ export type SpriteData = SpriteFrame[][];
 
 export type ServerMessage =
   | { type: "layout"; layout: OfficeLayout }
-  | { type: "agent_spawn"; id: string; palette: number[]; seatId?: number }
+  | { type: "agent_spawn"; id: string; palette: string[]; seatId?: number }
   | { type: "agent_remove"; id: string }
   | { type: "agent_active"; id: string; seatId: number }
   | { type: "agent_idle"; id: string }

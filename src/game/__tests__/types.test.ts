@@ -74,7 +74,7 @@ describe("ServerMessage union discrimination", () => {
     const spawnMsg: ServerMessage = {
       type: "agent_spawn",
       id: "agent-1",
-      palette: [255, 0, 0],
+      palette: ["#ff0000", "#00ff00"],
       seatId: 0,
     };
     expect(spawnMsg.type).toBe("agent_spawn");
