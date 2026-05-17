@@ -9,19 +9,53 @@
 <body>
   <header>
     <h1>PIXEL AGENTS</h1>
-    <nav>
-      <a href="/" class="active">Agents</a>
-      <a href="/info.html">Info</a>
-    </nav>
     <div class="status-indicator">
       <div id="status-dot" class="status-dot"></div>
       <span id="status-text">Disconnected</span>
     </div>
   </header>
 
-  <div id="agents-container"></div>
+  <canvas id="office"></canvas>
 
-  <script src="/js/renderer.js"></script>
-  <script src="/js/app.js"></script>
+  <!-- Editor toolbar (hidden until edit mode toggled) -->
+  <div id="editor-toolbar" class="editor-toolbar">
+    <button class="tool-btn" data-tool="wall" title="Wall (paint)"></button>
+    <button class="tool-btn" data-tool="floor_1" title="Floor Light"></button>
+    <button class="tool-btn" data-tool="floor_3" title="Floor Medium"></button>
+    <button class="tool-btn" data-tool="floor_7" title="Floor Dark"></button>
+    <span class="tool-separator"></span>
+    <button class="tool-btn" data-tool="desk" title="Desk"></button>
+    <button class="tool-btn" data-tool="chair" title="Chair"></button>
+    <span class="tool-separator"></span>
+    <button class="tool-btn" data-tool="erase" title="Erase (reset tile)"></button>
+    <span class="tool-separator"></span>
+    <button class="tool-btn" data-tool="undo" title="Undo"></button>
+    <button class="tool-btn" data-tool="redo" title="Redo"></button>
+    <span class="tool-separator"></span>
+    <button class="tool-btn" data-tool="export" title="Export Layout"></button>
+    <button class="tool-btn" data-tool="import" title="Import Layout"></button>
+  </div>
+
+  <!-- Canvas chrome: zoom controls + mute -->
+  <div id="canvas-chrome" class="canvas-chrome">
+    <button id="zoom-in-btn" class="chrome-btn" title="Zoom In">+</button>
+    <span id="zoom-label" class="zoom-label">2×</span>
+    <button id="zoom-out-btn" class="chrome-btn" title="Zoom Out">−</button>
+    <button id="mute-btn" class="chrome-btn" title="Toggle Sound">🔊</button>
+  </div>
+
+  <!-- Edit mode indicator -->
+  <div id="edit-indicator" class="edit-indicator">EDIT MODE</div>
+
+  <script type="module" src="/js/renderer.js"></script>
+  <script type="module" src="/js/tile-renderer.js"></script>
+  <script type="module" src="/js/scene-renderer.js"></script>
+  <script type="module" src="/js/game-loop.js"></script>
+  <script type="module" src="/js/sprites.js"></script>
+  <script type="module" src="/js/dissolve-effect.js"></script>
+  <script type="module" src="/js/furniture-sprites.js"></script>
+  <script type="module" src="/js/editor.js"></script>
+  <script type="module" src="/js/sound.js"></script>
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>
