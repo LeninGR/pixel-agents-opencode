@@ -1,311 +1,300 @@
-const AGENT_INFO = [
-  {
-    name: "sisyphus",
-    displayName: "Sisyphus",
-    role: "Orchestrator",
-    description:
-      "The main orchestrator and default agent. Delegates tasks to specialized agents and coordinates the overall workflow.",
-  },
-  {
-    name: "oracle",
-    displayName: "Oracle",
-    role: "High-IQ Consultant",
-    description:
-      "A wise and mystical consultant providing deep insights and high-level analysis.",
-  },
-  {
-    name: "librarian",
-    displayName: "Librarian",
-    role: "External Reference Search",
-    description:
-      "The bookish researcher who searches external references, documentation, and knowledge bases.",
-  },
-  {
-    name: "explore",
-    displayName: "Explore",
-    role: "Codebase Scanner",
-    description:
-      "An adventurous scout who greps and scans the codebase to find files and patterns.",
-  },
-  {
-    name: "prometheus",
-    displayName: "Prometheus",
-    role: "Planning Agent",
-    description:
-      "The fire-bearer who creates detailed implementation plans and strategies.",
-  },
-  {
-    name: "metis",
-    displayName: "Metis",
-    role: "Pre-Planning Consultant",
-    description:
-      "A thoughtful analyst who finds hidden requirements and edge cases before planning begins.",
-  },
-  {
-    name: "momus",
-    displayName: "Momus",
-    role: "Plan Reviewer & Critic",
-    description:
-      "The discerning critic who reviews plans and implementations, pointing out flaws and improvements.",
-  },
-  {
-    name: "atlas",
-    displayName: "Atlas",
-    role: "Knowledge Base Builder",
-    description:
-      "The strong builder who creates and maintains hierarchical knowledge bases.",
-  },
-  {
-    name: "hephaestus",
-    displayName: "Hephaestus",
-    role: "Code Craftsman",
-    description:
-      "The master craftsman who specializes in high-quality code generation.",
-  },
-];
+// ── Client OfficeState mirror ─────────────────────────────────────────────────
 
-function getAgentInfo(name) {
-  return AGENT_INFO.find((a) => a.name === name);
-}
+/**
+ * Client-side office state.
+ * Mirrors the server's OfficeState via WebSocket messages.
+ * Manages characters, layout, bubbles, and camera for the frontend renderer.
+ */
+export class OfficinaApp {
+  /** @type {Map<string, object>} */
+  characters = new Map();
+  /** @type {object|null} */
+  layout = null;
+  /** @type {Array<{id: string, col: number, row: number, text: string}>} */
+  bubbles = [];
+  /** @type {WebSocket|null} */
+  ws = null;
+  /** @type {HTMLCanvasElement|null} */
+  canvas = null;
+  /** @type {object} */
+  camera = { x: 0, y: 0, zoom: 2 };
+  /** @type {number} */
+  frame = 0;
+  /** @type {(sound: string) => void} */
+  onSound = null;
+  /** @type {import("./dissolve-effect.js").DissolveEffect|null} */
+  dissolveEffect = null;
 
-const ACTION_LABELS = {
-  idle: "Standing by",
-  thinking: "Thinking...",
-  coding: "Writing code",
-  reading: "Reading",
-  searching: "Searching",
-  running: "Running command",
-  orchestrating: "Conducting",
-  reviewing: "Reviewing",
-  planning: "Planning",
-  crafting: "Crafting code",
-};
-
-class PixelAgentsApp {
-  constructor() {
-    this.agents = {};
-    this.frame = 0;
-    this.canvases = new Map();
-    this.ws = null;
-    this.connected = false;
-
-    this.container = document.getElementById("agents-container");
-    this.statusDot = document.getElementById("status-dot");
-    this.statusText = document.getElementById("status-text");
-
+  /**
+   * @param {HTMLCanvasElement} canvas
+   */
+  constructor(canvas) {
+    this.canvas = canvas;
     this.connectWebSocket();
-    this.startAnimationLoop();
-
-    this.showDefaultAgents();
+    this.setupCanvasResize();
   }
 
-  showDefaultAgents() {
-    for (const agent of AGENT_INFO) {
-      this.agents[agent.name] = {
-        name: agent.name,
-        action: "idle",
-        detail: "",
-        since: Date.now(),
-      };
-    }
-    this.renderAgents();
-  }
+  // ── WebSocket ────────────────────────────────────────────────────────────
 
   connectWebSocket() {
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${location.host}/ws`;
+    const protocol = typeof location !== "undefined" && location.protocol === "https:" ? "wss:" : "ws:";
+    const host = typeof location !== "undefined" ? location.host : "localhost:3456";
+    const wsUrl = `${protocol}//${host}/ws`;
 
-    this.ws = new WebSocket(wsUrl);
+    try {
+      this.ws = new WebSocket(wsUrl);
 
-    this.ws.onopen = () => {
-      this.connected = true;
-      this.updateConnectionStatus();
-    };
+      this.ws.onopen = () => {
+        // Connected — layout will be sent by server
+      };
 
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "state_update") {
-          this.handleStateUpdate(data.agents);
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        } catch {
+          // Ignore malformed messages
         }
-      } catch {}
+      };
+
+      this.ws.onclose = () => {
+        // Reconnect after delay
+        if (typeof setTimeout !== "undefined") {
+          setTimeout(() => this.connectWebSocket(), 3000);
+        }
+      };
+
+      this.ws.onerror = () => {
+        // Error — will trigger onclose → reconnect
+      };
+    } catch {
+      // WebSocket not available (Node/test)
+      this.ws = null;
+    }
+  }
+
+  // ── Message routing ──────────────────────────────────────────────────────
+
+  /**
+   * Route a ServerMessage to the appropriate handler.
+   * @param {object} msg — discriminated union by msg.type
+   */
+  handleMessage(msg) {
+    if (!msg || typeof msg.type !== "string") return;
+
+    switch (msg.type) {
+      case "layout":
+        this.handleLayout(msg.layout);
+        break;
+      case "agent_spawn":
+        this.handleAgentSpawn(msg);
+        break;
+      case "agent_remove":
+        this.handleAgentRemove(msg);
+        break;
+      case "agent_active":
+        this.handleAgentActive(msg);
+        break;
+      case "agent_idle":
+        this.handleAgentIdle(msg);
+        break;
+      case "agent_tool":
+        this.handleAgentTool(msg);
+        break;
+      case "subagent_spawn":
+        this.handleSubagentSpawn(msg);
+        break;
+      case "subagent_remove":
+        this.handleSubagentRemove(msg);
+        break;
+      case "agent_bubble":
+        this.handleAgentBubble(msg);
+        break;
+      case "sound_play":
+        this.handleSoundPlay(msg);
+        break;
+      // Ignore unknown types gracefully
+    }
+  }
+
+  // ── Layout ───────────────────────────────────────────────────────────────
+
+  handleLayout(layout) {
+    this.layout = layout;
+  }
+
+  // ── Agent lifecycle ─────────────────────────────────────────────────────
+
+  handleAgentSpawn(msg) {
+    const { id, palette, seatId } = msg;
+    // Default position if no seat known
+    const col = 10;
+    const row = 5;
+
+    this.characters.set(id, {
+      id,
+      palette,
+      col,
+      row,
+      direction: 0,
+      frame: 0,
+      state: "idle",
+      seatId: seatId ?? -1,
+      tool: null,
+    });
+  }
+
+  handleAgentRemove(msg) {
+    // Trigger dissolve effect before removing character
+    const ch = this.characters.get(msg.id);
+    if (ch && this.dissolveEffect) {
+      this.dissolveEffect.start(ch.col, ch.row, ch.palette);
+    }
+    this.characters.delete(msg.id);
+  }
+
+  handleAgentActive(msg) {
+    const ch = this.characters.get(msg.id);
+    if (ch) {
+      ch.state = "work";
+      ch.seatId = msg.seatId;
+    }
+  }
+
+  handleAgentIdle(msg) {
+    const ch = this.characters.get(msg.id);
+    if (ch) {
+      ch.state = "idle";
+    }
+  }
+
+  handleAgentTool(msg) {
+    const ch = this.characters.get(msg.id);
+    if (ch) {
+      ch.tool = msg.tool;
+    }
+  }
+
+  handleSubagentSpawn(msg) {
+    const { parentId, id } = msg;
+    const parent = this.characters.get(parentId);
+    const col = parent ? parent.col + 1 : 10;
+    const row = parent ? parent.row : 5;
+
+    this.characters.set(id, {
+      id,
+      palette: parent ? [...parent.palette] : ["#f4c08e", "#3d2b1f", "#7f8c8d", "#2c3e50", "#bdc3c7", "#2c3e50"],
+      col,
+      row,
+      direction: 0,
+      frame: 0,
+      state: "idle",
+      seatId: -1,
+      tool: null,
+    });
+  }
+
+  handleSubagentRemove(msg) {
+    const subId = `sub-${msg.parentId}-${msg.toolId}`;
+    this.characters.delete(subId);
+  }
+
+  handleAgentBubble(msg) {
+    const ch = this.characters.get(msg.id);
+    if (ch) {
+      this.bubbles.push({
+        id: msg.id,
+        col: ch.col,
+        row: ch.row,
+        text: msg.bubble,
+        timeout: 3000,
+      });
+    }
+  }
+
+  handleSoundPlay(msg) {
+    if (this.onSound) {
+      this.onSound(msg.sound);
+    }
+  }
+
+  // ── Canvas resize ────────────────────────────────────────────────────────
+
+  setupCanvasResize() {
+    if (!this.canvas) return;
+
+    const resize = () => {
+      const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      const parent = this.canvas.parentElement;
+      const w = parent ? parent.clientWidth : (this.canvas.width || 800);
+      const h = parent ? parent.clientHeight : (this.canvas.height || 600);
+
+      this.canvas.width = w * dpr;
+      this.canvas.height = h * dpr;
+      if (this.canvas.style) {
+        this.canvas.style.width = w + "px";
+        this.canvas.style.height = h + "px";
+      }
+
+      const ctx = this.canvas.getContext("2d");
+      if (ctx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
     };
 
-    this.ws.onclose = () => {
-      this.connected = false;
-      this.updateConnectionStatus();
-      setTimeout(() => this.connectWebSocket(), 3000);
-    };
-
-    this.ws.onerror = () => {
-      this.connected = false;
-      this.updateConnectionStatus();
-    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", resize);
+    }
+    resize();
   }
 
-  updateConnectionStatus() {
-    if (this.statusDot) {
-      this.statusDot.classList.toggle("connected", this.connected);
-    }
-    if (this.statusText) {
-      this.statusText.textContent = this.connected
-        ? "Connected"
-        : "Disconnected";
-    }
-  }
+  // ── Update tick ──────────────────────────────────────────────────────────
 
-  handleStateUpdate(agents) {
-    let changed = false;
-    for (const [name, state] of Object.entries(agents)) {
-      const existing = this.agents[name];
-      if (
-        !existing ||
-        existing.action !== state.action ||
-        existing.detail !== state.detail
-      ) {
-        this.agents[name] = state;
-        changed = true;
-      }
-    }
-    if (changed) {
-      this.renderAgents();
-    }
-  }
+  /**
+   * Update client-side state: advance animations, clean expired bubbles.
+   * @param {number} dt — delta time in seconds
+   */
+  update(dt) {
+    this.frame++;
 
-  renderAgents() {
-    if (!this.container) return;
-
-    const existingSlots = new Set();
-    for (const slot of this.container.querySelectorAll(".agent-slot")) {
-      existingSlots.add(slot.dataset.agent);
+    // Advance character frames for animation
+    for (const ch of this.characters.values()) {
+      ch.frame = (ch.frame + 1) % 60; // Wrap at 60 to avoid overflow
     }
 
-    const agentNames = Object.keys(this.agents);
-    const currentSlots = new Set(agentNames);
-
-    for (const name of existingSlots) {
-      if (!currentSlots.has(name)) {
-        const slot = this.container.querySelector(
-          `.agent-slot[data-agent="${name}"]`,
-        );
-        if (slot) slot.remove();
-        this.canvases.delete(name);
-      }
-    }
-
-    for (const name of agentNames) {
-      const state = this.agents[name];
-      const info = getAgentInfo(name);
-
-      let slot = this.container.querySelector(
-        `.agent-slot[data-agent="${name}"]`,
-      );
-
-      if (!slot) {
-        slot = this.createAgentSlot(name, state, info);
-        this.container.appendChild(slot);
-      }
-
-      this.updateAgentSlot(slot, state, info);
-    }
-  }
-
-  createAgentSlot(name, state, info) {
-    const slot = document.createElement("div");
-    slot.className = "agent-slot";
-    slot.dataset.agent = name;
-
-    const canvas = document.createElement("canvas");
-    canvas.className = "agent-canvas";
-    canvas.width = 128;
-    canvas.height = 128;
-    this.canvases.set(name, canvas);
-
-    const nameLabel = document.createElement("div");
-    nameLabel.className = "agent-name";
-    const palette = window.PixelRenderer.getPalette(name);
-    nameLabel.style.color = palette.shirt;
-    nameLabel.textContent = info ? info.displayName : name;
-
-    const actionLabel = document.createElement("div");
-    actionLabel.className = "agent-action";
-    actionLabel.textContent = ACTION_LABELS[state.action] || state.action;
-
-    const tooltip = document.createElement("div");
-    tooltip.className = "tooltip";
-
-    const tooltipName = document.createElement("div");
-    tooltipName.className = "tooltip-name";
-    tooltipName.textContent = info ? info.displayName : name;
-
-    const tooltipRole = document.createElement("div");
-    tooltipRole.className = "tooltip-role";
-    tooltipRole.textContent = info ? info.role : "Agent";
-
-    const tooltipAction = document.createElement("div");
-    tooltipAction.className = "tooltip-action";
-    tooltipAction.textContent = state.detail || ACTION_LABELS[state.action] || "";
-
-    tooltip.appendChild(tooltipName);
-    tooltip.appendChild(tooltipRole);
-    tooltip.appendChild(tooltipAction);
-
-    slot.appendChild(tooltip);
-    slot.appendChild(canvas);
-    slot.appendChild(nameLabel);
-    slot.appendChild(actionLabel);
-
-    return slot;
-  }
-
-  updateAgentSlot(slot, state, info) {
-    const actionLabel = slot.querySelector(".agent-action");
-    if (actionLabel) {
-      actionLabel.textContent = ACTION_LABELS[state.action] || state.action;
-    }
-
-    const tooltipAction = slot.querySelector(".tooltip-action");
-    if (tooltipAction) {
-      tooltipAction.textContent =
-        state.detail || ACTION_LABELS[state.action] || "";
-    }
-  }
-
-  startAnimationLoop() {
-    const spriteInterval = 1000 / 4;
-    let lastSpriteUpdate = 0;
-
-    const loop = (timestamp) => {
-      if (timestamp - lastSpriteUpdate >= spriteInterval) {
-        lastSpriteUpdate = timestamp;
-        this.frame++;
-        this.drawAllAgents();
-      }
-      requestAnimationFrame(loop);
-    };
-
-    requestAnimationFrame(loop);
-  }
-
-  drawAllAgents() {
-    for (const [name, canvas] of this.canvases) {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) continue;
-
-      const state = this.agents[name];
-      if (!state) continue;
-
-      window.PixelRenderer.drawAgent(
-        ctx,
-        name,
-        state.action,
-        this.frame,
-        canvas.width,
-      );
-    }
+    // Remove expired bubbles
+    this.bubbles = this.bubbles.filter((b) => {
+      b.timeout -= dt * 1000;
+      return b.timeout > 0;
+    });
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  new PixelAgentsApp();
-});
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+
+/**
+ * Initialize the application when the DOM is ready.
+ * Creates a single canvas and starts the OfficinaApp.
+ */
+export function initOfficina() {
+  const canvas = document.getElementById("office");
+  if (!canvas) {
+    console.error("Canvas #office not found");
+    return null;
+  }
+
+  const app = new OfficinaApp(canvas);
+  return app;
+}
+
+// Auto-bootstrap if running in browser (via module script tag — deferred by default)
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      initOfficina();
+    });
+  } else {
+    // DOM already ready (module is deferred)
+    initOfficina();
+  }
+}
