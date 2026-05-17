@@ -35,6 +35,14 @@ export function isCharacterState(value: unknown): value is CharacterState {
 
 // ── Furniture ───────────────────────────────────────────────────────────────
 
+export interface FurnitureCatalogEntry {
+  id: string;
+  name: string;
+  category: "furniture" | "wall";
+  footprint: Tile[];
+  seats: Tile[];
+}
+
 export interface FurnitureInstance {
   id: string;
   type: string;
