@@ -1,8 +1,10 @@
 import { resolve, join, extname } from "path"
 import { existsSync, readFileSync } from "fs"
+import { fileURLToPath } from "url"
 import type { Server, ServerWebSocket } from "bun"
 import type { StateManager } from "./state-manager.js"
-import type { ServerConfig, StateUpdate } from "./types.js"
+import { OfficeState } from "./game/office-state.js"
+import type { ServerConfig, StateUpdate, ServerMessage } from "./types.js"
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -18,19 +20,34 @@ export class PixelAgentsServer {
   private server: Server<undefined> | null = null
   private webRoot: string
   private stateManager: StateManager
+  private officeState: OfficeState
   private sockets: Set<ServerWebSocket<undefined>> = new Set()
-  private unsubscribe: (() => void) | null = null
+  private unsubscribeState: (() => void) | null = null
+  private unsubscribeOffice: (() => void) | null = null
   port: number
+  onLayoutSave: ((layout: any) => void) | null = null
 
-  constructor(stateManager: StateManager, config: ServerConfig) {
+  constructor(
+    stateManager: StateManager,
+    officeState: OfficeState,
+    config: ServerConfig,
+  ) {
     this.stateManager = stateManager
+    this.officeState = officeState
     this.port = config.port
-    this.webRoot = resolve(import.meta.dir, "web")
+    const __dirname = fileURLToPath(new URL(".", import.meta.url))
+    this.webRoot = resolve(__dirname, "web")
   }
 
   start(): void {
-    this.unsubscribe = this.stateManager.onStateChange((update) => {
+    // Subscribe to StateManager for backward compat
+    this.unsubscribeState = this.stateManager.onStateChange((update) => {
       this.broadcastToClients(update)
+    })
+
+    // Subscribe to OfficeState for ServerMessage events
+    this.unsubscribeOffice = this.officeState.subscribe((msg) => {
+      this.broadcastToClients(msg)
     })
 
     this.server = Bun.serve({
@@ -52,13 +69,22 @@ export class PixelAgentsServer {
       websocket: {
         open: (ws) => {
           this.sockets.add(ws)
+          // Send full layout on connect
+          const layoutMsg: ServerMessage = {
+            type: "layout",
+            layout: this.officeState.layout,
+          }
+          ws.send(JSON.stringify(layoutMsg))
+          // Also send backward compat state snapshot
           const snapshot = this.stateManager.getSnapshot()
           ws.send(JSON.stringify(snapshot))
         },
         close: (ws) => {
           this.sockets.delete(ws)
         },
-        message: () => {},
+        message: (ws, raw) => {
+          this.handleClientMessage(ws, raw)
+        },
       },
     })
 
@@ -66,8 +92,10 @@ export class PixelAgentsServer {
   }
 
   stop(): void {
-    this.unsubscribe?.()
-    this.unsubscribe = null
+    this.unsubscribeState?.()
+    this.unsubscribeState = null
+    this.unsubscribeOffice?.()
+    this.unsubscribeOffice = null
     this.server?.stop()
     this.server = null
     this.sockets.clear()
@@ -77,12 +105,39 @@ export class PixelAgentsServer {
     return `http://127.0.0.1:${this.port}`
   }
 
-  private broadcastToClients(update: StateUpdate): void {
-    const message = JSON.stringify(update)
+  broadcast(msg: ServerMessage | StateUpdate): void {
+    this.broadcastToClients(msg)
+  }
+
+  private broadcastToClients(msg: ServerMessage | StateUpdate): void {
+    const message = JSON.stringify(msg)
     for (const ws of this.sockets) {
       try {
         ws.send(message)
       } catch {}
+    }
+  }
+
+  private handleClientMessage(
+    _ws: ServerWebSocket<undefined>,
+    raw: string | Buffer,
+  ): void {
+    try {
+      const data = JSON.parse(raw.toString())
+      if (data.type === "layout_save" && data.layout) {
+        if (this.onLayoutSave) {
+          this.onLayoutSave(data.layout)
+        }
+      } else if (data.type === "layout_load") {
+        // Send current layout back to requesting client
+        const layoutMsg: ServerMessage = {
+          type: "layout",
+          layout: this.officeState.layout,
+        }
+        _ws.send(JSON.stringify(layoutMsg))
+      }
+    } catch {
+      // Ignore malformed messages
     }
   }
 
