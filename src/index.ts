@@ -1,21 +1,20 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import { tool } from "@opencode-ai/plugin";
-import { StateManager } from "./state-manager.js";
-import { PixelAgentsServer } from "./server.js";
+import type { Plugin } from '@opencode-ai/plugin';
+import { tool } from '@opencode-ai/plugin';
+import { StateManager } from './state-manager.js';
 
-const DEFAULT_PORT = 3456;
+const SERVER_URL = 'http://127.0.0.1:3456';
 
-// ── Palettes (session → persistent color set) ──────────────────────────────
+// ── Palettes ────────────────────────────────────────────────────────────────
 
 const PALETTE_POOL: string[][] = [
-  ["#f0c8a0", "#3d2010", "#cc4444", "#2a2a3a"],
-  ["#d4a574", "#1a1a1a", "#3366aa", "#3a3a2a"],
-  ["#e8c090", "#5a3a1a", "#44aa44", "#2a3040"],
-  ["#c8956c", "#8a6030", "#aa44aa", "#3a2a2a"],
-  ["#f5d0b0", "#c8a030", "#dd8833", "#202840"],
-  ["#b87850", "#0a0a0a", "#eeeeee", "#1a2a1a"],
-  ["#e0b888", "#4a2a3a", "#338888", "#2a2828"],
-  ["#d0a068", "#6a4a2a", "#ffcc00", "#283040"],
+  ['#f0c8a0', '#3d2010', '#cc4444', '#2a2a3a'],
+  ['#d4a574', '#1a1a1a', '#3366aa', '#3a3a2a'],
+  ['#e8c090', '#5a3a1a', '#44aa44', '#2a3040'],
+  ['#c8956c', '#8a6030', '#aa44aa', '#3a2a2a'],
+  ['#f5d0b0', '#c8a030', '#dd8833', '#202840'],
+  ['#b87850', '#0a0a0a', '#eeeeee', '#1a2a1a'],
+  ['#e0b888', '#4a2a3a', '#338888', '#2a2828'],
+  ['#d0a068', '#6a4a2a', '#ffcc00', '#283040'],
 ];
 
 let paletteIndex = 0;
@@ -31,64 +30,88 @@ function paletteForSession(sessionID: string): string[] {
 }
 
 function safeAgentName(agent: unknown, fallback: string): string {
-  if (typeof agent === "string") return agent;
-  if (agent && typeof agent === "object" && "name" in agent && typeof (agent as Record<string, unknown>).name === "string") {
+  if (typeof agent === 'string') return agent;
+  if (
+    agent &&
+    typeof agent === 'object' &&
+    'name' in agent &&
+    typeof (agent as Record<string, unknown>).name === 'string'
+  ) {
     return (agent as Record<string, string>).name;
   }
   return fallback;
+}
+
+// ── HTTP broadcast helper ────────────────────────────────────────────────────
+
+async function broadcast(msg: Record<string, unknown>): Promise<void> {
+  try {
+    await fetch(`${SERVER_URL}/api/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg),
+    });
+  } catch {
+    // Server might not be running — ignore
+  }
 }
 
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
 const PixelAgentsPlugin: Plugin = async (ctx) => {
   const stateManager = new StateManager();
-  const server = new PixelAgentsServer(stateManager, { port: DEFAULT_PORT, host: "127.0.0.1" });
-
   const sessionAgentMap = new Map<string, string>();
 
   function getAgentNameForSession(sessionID: string): string {
     return sessionAgentMap.get(sessionID) || sessionID;
   }
 
-  try {
-    server.start();
-    await ctx.client.app.log({
-      body: { service: "pixel-agents", level: "info", message: `Pixel Agents running at ${server.url}` },
-    });
-  } catch (err) {
-    await ctx.client.app.log({
-      body: { service: "pixel-agents", level: "error", message: `Failed to start: ${err}` },
-    });
-  }
+  await ctx.client.app.log({
+    body: {
+      service: 'pixel-agents',
+      level: 'info',
+      message: `Pixel Agents relay ready → ${SERVER_URL}`,
+    },
+  });
 
   return {
     tool: {
-      "pixel-agents": tool({
-        description: "Open the Pixel Agents visualization page",
+      'pixel-agents': tool({
+        description: 'Open the Pixel Agents visualization page',
         args: {},
         async execute() {
-          try { await ctx.$`open ${server.url}`; }
-          catch { await ctx.$`xdg-open ${server.url}`; }
-          return `Pixel Agents is running at ${server.url}`;
+          try {
+            await ctx.$`open ${SERVER_URL}`;
+          } catch {
+            await ctx.$`xdg-open ${SERVER_URL}`;
+          }
+          return `Pixel Agents is running at ${SERVER_URL}`;
         },
       }),
     },
 
-    // ── Event hooks ──────────────────────────────────────────────────────────
+    // ── Event hooks ────────────────────────────────────────────────────────
 
     event: async ({ event }) => {
-      const isSessionEvent = event.type.startsWith("session.");
+      const isSessionEvent = event.type.startsWith('session.');
       if (isSessionEvent) {
         const props = event.properties as Record<string, unknown>;
-        const sessionID = (typeof props.sessionID === "string" ? props.sessionID : undefined)
-          || (props.info && typeof props.info === "object" ? (props.info as { id: string }).id : undefined);
+        const sessionID =
+          (typeof props.sessionID === 'string' ? props.sessionID : undefined) ||
+          (props.info && typeof props.info === 'object'
+            ? (props.info as { id: string }).id
+            : undefined);
 
-        if (sessionID && typeof sessionID === "string" && !sessionID.startsWith("msg_")) {
+        if (sessionID && typeof sessionID === 'string' && !sessionID.startsWith('msg_')) {
           const agentName = getAgentNameForSession(sessionID);
-          stateManager.setAgentAction(agentName, event.type === "session.idle" ? "idle" : "thinking", "");
+          stateManager.setAgentAction(
+            agentName,
+            event.type === 'session.idle' ? 'idle' : 'thinking',
+            '',
+          );
 
-          server.broadcast({
-            type: "session_event",
+          await broadcast({
+            type: 'session_event',
             eventType: event.type,
             sessionID,
             agentName,
@@ -98,25 +121,33 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
       }
     },
 
-    "chat.message": async ({ sessionID, agent }) => {
+    'chat.message': async ({ sessionID, agent }) => {
       const agentName = safeAgentName(agent, sessionID);
       sessionAgentMap.set(sessionID, agentName);
-      stateManager.setAgentAction(agentName, "thinking", "Composing response");
+      stateManager.setAgentAction(agentName, 'thinking', 'Composing response');
 
-      server.broadcast({
-        type: "agent_spawn",
+      await broadcast({
+        type: 'agent_spawn',
         id: sessionID,
         name: agentName,
         palette: paletteForSession(sessionID),
       });
     },
 
-    "tool.execute.before": async ({ tool: toolName, sessionID }) => {
+    'tool.execute.before': async ({ tool: toolName, sessionID }) => {
       const agentName = getAgentNameForSession(sessionID);
       stateManager.handleToolStart(agentName, toolName);
+
+      await broadcast({
+        type: 'agent_tool',
+        id: sessionID,
+        name: agentName,
+        tool: toolName,
+        action: 'active',
+      });
     },
 
-    "tool.execute.after": async ({ tool: toolName, sessionID }) => {
+    'tool.execute.after': async ({ tool: toolName, sessionID }) => {
       const agentName = getAgentNameForSession(sessionID);
       stateManager.handleToolEnd(agentName, toolName);
     },
