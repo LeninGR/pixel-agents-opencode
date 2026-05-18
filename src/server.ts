@@ -143,6 +143,8 @@ export class PixelAgentsServer {
 
   private serveStatic(pathname: string): Response {
     if (pathname === "/") pathname = "/index.html"
+    // Strip leading slash — path.join treats "/foo" as absolute
+    if (pathname.startsWith("/")) pathname = pathname.slice(1)
 
     const filePath = join(this.webRoot, pathname)
 
