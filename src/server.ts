@@ -1,10 +1,9 @@
-import { resolve, join, extname } from "path"
-import { existsSync, readFileSync } from "fs"
-import { fileURLToPath } from "url"
-import type { Server, ServerWebSocket } from "bun"
-import type { StateManager } from "./state-manager.js"
-import { OfficeState } from "./game/office-state.js"
-import type { ServerConfig, StateUpdate, ServerMessage } from "./types.js"
+import { resolve, join, extname } from "path";
+import { existsSync, readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import type { Server, ServerWebSocket } from "bun";
+import type { StateManager } from "./state-manager.js";
+import type { ServerConfig, StateUpdate } from "./types.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -14,171 +13,102 @@ const MIME_TYPES: Record<string, string> = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
-}
+};
 
 export class PixelAgentsServer {
-  private server: Server<undefined> | null = null
-  private webRoot: string
-  private stateManager: StateManager
-  private officeState: OfficeState
-  private sockets: Set<ServerWebSocket<undefined>> = new Set()
-  private unsubscribeState: (() => void) | null = null
-  private unsubscribeOffice: (() => void) | null = null
-  port: number
-  onLayoutSave: ((layout: any) => void) | null = null
+  private server: Server<undefined> | null = null;
+  private webRoot: string;
+  private stateManager: StateManager;
+  private sockets: Set<ServerWebSocket<undefined>> = new Set();
+  private unsubscribeState: (() => void) | null = null;
+  port: number;
 
-  constructor(
-    stateManager: StateManager,
-    officeState: OfficeState,
-    config: ServerConfig,
-  ) {
-    this.stateManager = stateManager
-    this.officeState = officeState
-    this.port = config.port
-    const __dirname = fileURLToPath(new URL(".", import.meta.url))
-    this.webRoot = resolve(__dirname, "web")
+  /** Callback for client→server messages (layout_save, layout_load, etc.) */
+  onClientMessage: ((data: Record<string, unknown>, ws: ServerWebSocket<undefined>) => void) | null = null;
+
+  constructor(stateManager: StateManager, config: ServerConfig) {
+    this.stateManager = stateManager;
+    this.port = config.port;
+    const __dirname = fileURLToPath(new URL(".", import.meta.url));
+    this.webRoot = resolve(__dirname, "web");
   }
 
   start(): void {
-    // Subscribe to StateManager for backward compat
     this.unsubscribeState = this.stateManager.onStateChange((update) => {
-      this.broadcastToClients(update)
-    })
-
-    // Subscribe to OfficeState for ServerMessage events
-    this.unsubscribeOffice = this.officeState.subscribe((msg) => {
-      this.broadcastToClients(msg)
-    })
+      this.broadcast(update);
+    });
 
     this.server = Bun.serve({
       port: this.port,
       hostname: "127.0.0.1",
-
       fetch: (req, server) => {
-        const url = new URL(req.url)
-
+        const url = new URL(req.url);
         if (url.pathname === "/ws") {
-          const upgraded = server.upgrade(req)
-          if (upgraded) return undefined as unknown as Response
-          return new Response("WebSocket upgrade failed", { status: 400 })
+          const upgraded = server.upgrade(req);
+          if (upgraded) return undefined as unknown as Response;
+          return new Response("WebSocket upgrade failed", { status: 400 });
         }
-
-        return this.serveStatic(url.pathname)
+        return this.serveStatic(url.pathname);
       },
-
       websocket: {
         open: (ws) => {
-          this.sockets.add(ws)
-          // Send full layout on connect
-          const layoutMsg: ServerMessage = {
-            type: "layout",
-            layout: this.officeState.layout,
-          }
-          ws.send(JSON.stringify(layoutMsg))
-          // Send existing characters so late-connecting clients see current state
-          for (const ch of this.officeState.characters.values()) {
-            const spawnMsg: ServerMessage = {
-              type: "agent_spawn",
-              id: ch.id,
-              name: ch.name,
-              palette: ch.palette,
-              seatId: undefined,
-              col: ch.col,
-              row: ch.row,
-            }
-            ws.send(JSON.stringify(spawnMsg))
-          }
-          // Also send backward compat state snapshot
-          const snapshot = this.stateManager.getSnapshot()
-          ws.send(JSON.stringify(snapshot))
+          this.sockets.add(ws);
+          // Send current state snapshot
+          ws.send(JSON.stringify(this.stateManager.getSnapshot()));
         },
         close: (ws) => {
-          this.sockets.delete(ws)
+          this.sockets.delete(ws);
         },
         message: (ws, raw) => {
-          this.handleClientMessage(ws, raw)
+          try {
+            const data = JSON.parse(raw.toString());
+            if (this.onClientMessage) this.onClientMessage(data, ws);
+          } catch { /* ignore malformed */ }
         },
       },
-    })
+    });
 
-    this.port = this.server.port ?? this.port
+    this.port = this.server.port ?? this.port;
   }
 
   stop(): void {
-    this.unsubscribeState?.()
-    this.unsubscribeState = null
-    this.unsubscribeOffice?.()
-    this.unsubscribeOffice = null
-    this.server?.stop()
-    this.server = null
-    this.sockets.clear()
+    this.unsubscribeState?.();
+    this.unsubscribeState = null;
+    this.server?.stop();
+    this.server = null;
+    this.sockets.clear();
   }
 
   get url(): string {
-    return `http://127.0.0.1:${this.port}`
+    return `http://127.0.0.1:${this.port}`;
   }
 
-  broadcast(msg: ServerMessage | StateUpdate): void {
-    this.broadcastToClients(msg)
-  }
-
-  private broadcastToClients(msg: ServerMessage | StateUpdate): void {
-    const message = JSON.stringify(msg)
+  /** Broadcast any JSON-serializable message to all connected clients. */
+  broadcast(msg: StateUpdate | Record<string, unknown>): void {
+    const raw = JSON.stringify(msg);
     for (const ws of this.sockets) {
-      try {
-        ws.send(message)
-      } catch {}
-    }
-  }
-
-  private handleClientMessage(
-    _ws: ServerWebSocket<undefined>,
-    raw: string | Buffer,
-  ): void {
-    try {
-      const data = JSON.parse(raw.toString())
-      if (data.type === "layout_save" && data.layout) {
-        if (this.onLayoutSave) {
-          this.onLayoutSave(data.layout)
-        }
-      } else if (data.type === "layout_load") {
-        // Send current layout back to requesting client
-        const layoutMsg: ServerMessage = {
-          type: "layout",
-          layout: this.officeState.layout,
-        }
-        _ws.send(JSON.stringify(layoutMsg))
-      }
-    } catch {
-      // Ignore malformed messages
+      try { ws.send(raw); } catch { /* ignore */ }
     }
   }
 
   private serveStatic(pathname: string): Response {
-    if (pathname === "/") pathname = "/index.html"
-    // Strip leading slash — path.join treats "/foo" as absolute
-    if (pathname.startsWith("/")) pathname = pathname.slice(1)
-
-    const filePath = join(this.webRoot, pathname)
-
+    if (pathname === "/") pathname = "/index.html";
+    if (pathname.startsWith("/")) pathname = pathname.slice(1);
+    const filePath = join(this.webRoot, pathname);
     if (!filePath.startsWith(this.webRoot)) {
-      return new Response("Forbidden", { status: 403 })
+      return new Response("Forbidden", { status: 403 });
     }
-
     if (!existsSync(filePath)) {
-      return new Response("Not Found", { status: 404 })
+      return new Response("Not Found", { status: 404 });
     }
-
     try {
-      const content = readFileSync(filePath)
-      const ext = extname(filePath)
-      const contentType = MIME_TYPES[ext] || "application/octet-stream"
-
+      const content = readFileSync(filePath);
+      const ext = extname(filePath);
       return new Response(content, {
-        headers: { "Content-Type": contentType },
-      })
+        headers: { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" },
+      });
     } catch {
-      return new Response("Internal Server Error", { status: 500 })
+      return new Response("Internal Server Error", { status: 500 });
     }
   }
 }
