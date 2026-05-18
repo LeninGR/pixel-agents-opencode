@@ -1,15 +1,14 @@
 import {
-  type AgentState,
+  type OpenCodeAgentState,
   type AgentAction,
-  type AgentName,
   type StateUpdate,
   TOOL_ACTION_MAP,
-} from "./types.js"
+} from "./opencode-types.js"
 
 type StateChangeCallback = (update: StateUpdate) => void
 
 export class StateManager {
-  private agents: Map<string, AgentState> = new Map()
+  private agents: Map<string, OpenCodeAgentState> = new Map()
   private listeners: Set<StateChangeCallback> = new Set()
 
   onStateChange(callback: StateChangeCallback): () => void {
@@ -25,7 +24,7 @@ export class StateManager {
   }
 
   setAgentAction(
-    name: AgentName,
+    name: string,
     action: AgentAction,
     detail: string = "",
     tool?: string,
@@ -43,23 +42,23 @@ export class StateManager {
     this.broadcast()
   }
 
-  setAgentIdle(name: AgentName): void {
+  setAgentIdle(name: string): void {
     this.setAgentAction(name, "idle")
   }
 
-  handleToolStart(agentName: AgentName, toolName: string): void {
+  handleToolStart(agentName: string, toolName: string): void {
     const action = TOOL_ACTION_MAP[toolName] || "thinking"
     this.setAgentAction(agentName, action, `Using ${toolName}`, toolName)
   }
 
-  handleToolEnd(agentName: AgentName, toolName: string): void {
+  handleToolEnd(agentName: string, toolName: string): void {
     const current = this.agents.get(agentName)
     if (current?.tool === toolName) {
       this.setAgentAction(agentName, "thinking", "Processing results")
     }
   }
 
-  removeAgent(name: AgentName): void {
+  removeAgent(name: string): void {
     this.agents.delete(name)
     this.broadcast()
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { StateUpdate, AgentState, AgentAction } from "../types.js";
+import type { StateUpdate, OpenCodeAgentState, AgentAction } from "../opencode-types.js";
 
 describe("StateUpdate", () => {
   it("compiles with valid agent states", () => {
@@ -21,7 +21,7 @@ describe("StateUpdate", () => {
 
 describe("AgentState", () => {
   it("supports optional tool field", () => {
-    const state: AgentState = {
+    const state: OpenCodeAgentState = {
       name: "test-agent",
       action: "reading",
       detail: "glob src/",
@@ -34,7 +34,7 @@ describe("AgentState", () => {
 
 describe("TOOL_ACTION_MAP", () => {
   it("maps known tools to actions", async () => {
-    const { TOOL_ACTION_MAP } = await import("../types.js");
+    const { TOOL_ACTION_MAP } = await import("../opencode-types.js");
     expect(TOOL_ACTION_MAP["bash"]).toBe("running");
     expect(TOOL_ACTION_MAP["edit"]).toBe("coding");
     expect(TOOL_ACTION_MAP["read"]).toBe("reading");

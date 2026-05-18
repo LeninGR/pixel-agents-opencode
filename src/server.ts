@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import type { Server, ServerWebSocket } from "bun";
 import type { StateManager } from "./state-manager.js";
-import type { ServerConfig, StateUpdate } from "./types.js";
+import type { ServerConfig, StateUpdate } from "./opencode-types.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",

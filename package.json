@@ -69,7 +69,8 @@
     "test": "npm run test:webview && npm run test:server",
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
-    "knip": "knip"
+    "knip": "knip",
+    "build:opencode": "tsup src/index.ts --format esm --dts --out-dir dist"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -98,5 +99,10 @@
     "webview-ui/src/**/*.{ts,tsx}": "eslint --fix",
     "*.{ts,tsx,js,mjs,css,json,md}": "prettier --write",
     "webview-ui/**/*.{ts,tsx,js,css,json}": "prettier --write"
+  },
+  "type": "module",
+  "dependencies": {
+    "@opencode-ai/plugin": "latest",
+    "@opencode-ai/sdk": "latest"
   }
 }
