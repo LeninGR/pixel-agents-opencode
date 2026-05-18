@@ -5,11 +5,13 @@ import { TILE_SIZE, WALK_SPEED } from "./constants.js";
 
 export function createCharacter(
   id: string,
+  name: string,
   palette: string[],
   seat: Seat,
 ): Character {
   return {
     id,
+    name,
     col: seat.col,
     row: seat.row,
     state: "idle",

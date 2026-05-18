@@ -72,7 +72,7 @@ describe("ServerMessage union discrimination", () => {
 
   it("identifies agent_spawn messages", () => {
     const spawnMsg: ServerMessage = {
-      type: "agent_spawn",
+      type: "agent_spawn", name: "test",
       id: "agent-1",
       palette: ["#ff0000", "#00ff00"],
       seatId: 0,
@@ -123,7 +123,7 @@ describe("ServerMessage edge cases", () => {
 
   it("handles subagent_spawn with required fields", () => {
     const msg: ServerMessage = {
-      type: "subagent_spawn",
+      type: "subagent_spawn", name: "test-sub",
       parentId: "parent-1",
       toolId: "task-abc",
       id: "sub-1",

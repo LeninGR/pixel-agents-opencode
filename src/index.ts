@@ -4,29 +4,35 @@ import { StateManager } from "./state-manager.js"
 import { PixelAgentsServer } from "./server.js"
 import { OfficeState } from "./game/office-state.js"
 import { createDefaultLayout } from "./game/layout-serializer.js"
-import { MIN_AGENT_LIFETIME_S } from "./game/constants.js"
 
 const DEFAULT_PORT = 3456
 
-// ── Auto-generated palettes (session ID → deterministic color set) ──────────
+// ── Auto-generated palettes (session ID → persistent color set) ──────────
 
 const PALETTE_POOL: string[][] = [
-  ["#4a90d9", "#357abd", "#6bb5ff", "#e8f0fe"],
-  ["#9b59b6", "#7d3c98", "#c39bdb", "#f5eef8"],
-  ["#27ae60", "#1e8449", "#58d68d", "#eafaf1"],
-  ["#e67e22", "#ca6f1e", "#f0b37e", "#fef5e7"],
-  ["#e74c3c", "#c0392b", "#f1948a", "#fdedec"],
-  ["#1abc9c", "#17a589", "#76d7c4", "#e8f8f5"],
-  ["#d35400", "#a04000", "#f5b041", "#fef9e7"],
-  ["#34495e", "#2c3e50", "#7f8c8d", "#ebedef"],
+  // [skin,    hair,     shirt,    pants]
+  ["#f0c8a0", "#3d2010", "#cc4444", "#2a2a3a"], // fair, brown hair, red shirt
+  ["#d4a574", "#1a1a1a", "#3366aa", "#3a3a2a"], // tan, black hair, blue shirt
+  ["#e8c090", "#5a3a1a", "#44aa44", "#2a3040"], // warm, dark brown, green
+  ["#c8956c", "#8a6030", "#aa44aa", "#3a2a2a"], // olive, auburn, purple
+  ["#f5d0b0", "#c8a030", "#dd8833", "#202840"], // pale, blonde, orange
+  ["#b87850", "#0a0a0a", "#eeeeee", "#1a2a1a"], // dark, black, white
+  ["#e0b888", "#4a2a3a", "#338888", "#2a2828"], // light tan, maroon, teal
+  ["#d0a068", "#6a4a2a", "#ffcc00", "#283040"], // golden, chestnut, yellow
 ]
 
 let paletteIndex = 0
+const sessionPaletteMap = new Map<string, string[]>()
 
-function nextPalette(): string[] {
-  const p = PALETTE_POOL[paletteIndex % PALETTE_POOL.length]
+/** Returns a persistent palette for the given session ID — same session = same color. */
+function paletteForSession(sessionID: string): string[] {
+  const existing = sessionPaletteMap.get(sessionID)
+  if (existing) return existing
+
+  const p = [...PALETTE_POOL[paletteIndex % PALETTE_POOL.length]]
   paletteIndex++
-  return [...p]
+  sessionPaletteMap.set(sessionID, p)
+  return p
 }
 
 const PixelAgentsPlugin: Plugin = async (ctx) => {
@@ -40,6 +46,23 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     port: DEFAULT_PORT,
     host: "127.0.0.1",
   })
+
+  // ── Session tracking ──────────────────────────────────────────────────────
+  const sessionSeatMap = new Map<string, number>() // sessionID → seatId
+  const sessionAgentMap = new Map<string, string>() // sessionID → agentName (for StateManager compat)
+
+  function getAgentNameForSession(sessionID: string): string {
+    return sessionAgentMap.get(sessionID) || sessionID
+  }
+
+  /** Coerce agent parameter (string | object | undefined) to a safe string. */
+  function safeAgentName(agent: unknown, fallback: string): string {
+    if (typeof agent === "string") return agent
+    if (agent && typeof agent === "object" && "name" in agent && typeof (agent as Record<string, unknown>).name === "string") {
+      return (agent as Record<string, string>).name
+    }
+    return fallback
+  }
 
   try {
     server.start()
@@ -60,33 +83,6 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     })
   }
 
-  // ── Session tracking ──────────────────────────────────────────────────────
-  const sessionSeatMap = new Map<string, number>() // sessionID → seatId
-  const sessionAgentMap = new Map<string, string>() // sessionID → agentName (for StateManager compat)
-  const sessionIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
-
-  function getAgentNameForSession(sessionID: string): string {
-    return sessionAgentMap.get(sessionID) || sessionID
-  }
-
-  function scheduleAgentDespawn(sessionID: string): void {
-    // Clear any existing timer
-    const existing = sessionIdleTimers.get(sessionID)
-    if (existing) clearTimeout(existing)
-
-    const timer = setTimeout(() => {
-      officeState.removeAgent(sessionID)
-      stateManager.removeAgent(
-        getAgentNameForSession(sessionID),
-      )
-      sessionSeatMap.delete(sessionID)
-      sessionAgentMap.delete(sessionID)
-      sessionIdleTimers.delete(sessionID)
-    }, MIN_AGENT_LIFETIME_S * 1000)
-
-    sessionIdleTimers.set(sessionID, timer)
-  }
-
   return {
     tool: {
       "pixel-agents": tool({
@@ -105,30 +101,33 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     },
 
     event: async ({ event }) => {
-      switch (event.type) {
-        case "session.created": {
-          const sessionID = event.properties.info.id
-          // Cancel any pending despawn
-          const existingTimer = sessionIdleTimers.get(sessionID)
-          if (existingTimer) {
-            clearTimeout(existingTimer)
-            sessionIdleTimers.delete(sessionID)
+      // Spawn agent on session-level events (created, status, updated)
+      const isSessionEvent = event.type.startsWith("session.")
+      if (isSessionEvent) {
+        const props = event.properties as Record<string, unknown>
+        const sessionID = (typeof props.sessionID === "string" ? props.sessionID : undefined)
+          || (props.info && typeof props.info === "object" ? (props.info as { id: string }).id : undefined)
+
+        // Skip non-session IDs (message IDs, sub-IDs)
+        if (sessionID && typeof sessionID === "string" && !sessionID.startsWith("msg_") && !officeState.characters.has(sessionID)) {
+          const palette = paletteForSession(sessionID)
+          // Assign next available seat (round-robin)
+          if (!sessionSeatMap.has(sessionID)) {
+            const usedSeats = new Set(sessionSeatMap.values())
+            const nextSeat = officeState.seats.find(s => !usedSeats.has(s.id))
+            const seatId = nextSeat ? nextSeat.id : (officeState.seats[0]?.id ?? 0)
+            sessionSeatMap.set(sessionID, seatId)
           }
-          // Spawn agent if not already present
-          if (!officeState.characters.has(sessionID)) {
-            const palette = nextPalette()
-            officeState.addAgent(sessionID, palette)
-          }
-          break
+          officeState.addAgent(sessionID, getAgentNameForSession(sessionID), palette, sessionSeatMap.get(sessionID))
         }
-        case "session.idle": {
-          const sessionID = event.properties.sessionID
-          officeState.setAgentInactive(sessionID)
-          stateManager.setAgentIdle(
-            getAgentNameForSession(sessionID),
-          )
-          scheduleAgentDespawn(sessionID)
-          break
+      }
+
+      // Handle idle event
+      if (event.type === "session.idle") {
+        const idleSid = (event.properties as Record<string, unknown>).sessionID as string
+        if (idleSid) {
+          officeState.setAgentInactive(idleSid)
+          stateManager.setAgentIdle(getAgentNameForSession(idleSid))
         }
       }
     },
@@ -164,25 +163,23 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     },
 
     "chat.message": async ({ sessionID, agent }, { message }) => {
-      const agentName = agent || sessionID
+      const agentName = safeAgentName(agent, sessionID)
       sessionAgentMap.set(sessionID, agentName)
-
-      // Cancel any pending despawn — agent is active again
-      const existingTimer = sessionIdleTimers.get(sessionID)
-      if (existingTimer) {
-        clearTimeout(existingTimer)
-        sessionIdleTimers.delete(sessionID)
-      }
 
       // Spawn agent if not already in OfficeState
       if (!officeState.characters.has(sessionID)) {
-        const palette = nextPalette()
-        officeState.addAgent(sessionID, palette)
+        const palette = paletteForSession(sessionID)
+        officeState.addAgent(sessionID, agentName, palette)
+        await ctx.client.app.log({
+          body: { service: "pixel-agents", level: "info", message: `chat.message spawned agent: ${agentName} (${sessionID})` },
+        })
       }
 
-      // Assign seat if not already assigned
+      // Assign seat if not already assigned (round-robin)
       if (!sessionSeatMap.has(sessionID)) {
-        const seatId = officeState.seats.length > 0 ? officeState.seats[0].id : 0
+        const usedSeats = new Set(sessionSeatMap.values())
+        const nextSeat = officeState.seats.find(s => !usedSeats.has(s.id))
+        const seatId = nextSeat ? nextSeat.id : (officeState.seats[0]?.id ?? 0)
         sessionSeatMap.set(sessionID, seatId)
       }
 
@@ -191,10 +188,12 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     },
 
     "chat.params": async ({ sessionID, agent }) => {
-      sessionAgentMap.set(sessionID, agent)
-      stateManager.setAgentAction(agent, "thinking", "Preparing request")
+      const agentName = safeAgentName(agent, sessionID)
+      sessionAgentMap.set(sessionID, agentName)
+      stateManager.setAgentAction(agentName, "thinking", "Preparing request")
     },
   }
 }
 
 export default PixelAgentsPlugin
+export { PixelAgentsPlugin as server }

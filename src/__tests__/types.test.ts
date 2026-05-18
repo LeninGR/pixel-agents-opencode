@@ -19,7 +19,7 @@ describe("ServerMessage type guard", () => {
   it("identifies agent_spawn message", async () => {
     const { isServerMessage } = await import("../types.js");
     const msg: ServerMessage = {
-      type: "agent_spawn",
+      type: "agent_spawn", name: "test",
       id: "test-session",
       palette: ["#ff0000", "#00ff00"],
     };
@@ -61,7 +61,7 @@ describe("ServerMessage type guard", () => {
   it("identifies subagent_spawn message", async () => {
     const { isServerMessage } = await import("../types.js");
     const msg: ServerMessage = {
-      type: "subagent_spawn",
+      type: "subagent_spawn", name: "test-sub",
       parentId: "parent",
       toolId: "task-1",
       id: "sub-parent-task-1",

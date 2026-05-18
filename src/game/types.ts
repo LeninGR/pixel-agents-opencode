@@ -82,6 +82,7 @@ export interface OfficeLayout {
 
 export interface Character {
   id: string;
+  name: string;
   col: number;
   row: number;
   state: CharacterState;
@@ -104,12 +105,12 @@ export type SpriteData = SpriteFrame[][];
 
 export type ServerMessage =
   | { type: "layout"; layout: OfficeLayout }
-  | { type: "agent_spawn"; id: string; palette: string[]; seatId?: number }
+  | { type: "agent_spawn"; id: string; name: string; palette: string[]; seatId?: number; col?: number; row?: number }
   | { type: "agent_remove"; id: string }
   | { type: "agent_active"; id: string; seatId: number }
   | { type: "agent_idle"; id: string }
   | { type: "agent_tool"; id: string; tool: string }
-  | { type: "subagent_spawn"; parentId: string; toolId: string; id: string }
+  | { type: "subagent_spawn"; parentId: string; toolId: string; id: string; name: string }
   | { type: "subagent_remove"; parentId: string; toolId: string }
   | { type: "agent_bubble"; id: string; bubble: "waiting" | "permission" }
   | { type: "sound_play"; sound: "done" | "alert" };

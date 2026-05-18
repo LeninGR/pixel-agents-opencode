@@ -9,7 +9,7 @@ const DEFAULT_FLOOR_COLOR = "#d4c8a8";
 const DEFAULT_WALL_COLOR = "#6b5e4a";
 const GRID_COLOR = "rgba(0,0,0,0.08)";
 const SEAT_INDICATOR_COLOR = "rgba(88,166,255,0.3)";
-const FURNITURE_TINT = "rgba(0,0,0,0.1)";
+const FURNITURE_TINT = "rgba(0,0,0,0.04)"; // subtle shadow under furniture
 
 /**
  * Render all floor tiles, grid overlay, furniture footprints, and seat

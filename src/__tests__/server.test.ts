@@ -98,7 +98,7 @@ describe("PixelAgentsServer", () => {
 
     // Broadcast a message
     const msg: ServerMessage = {
-      type: "agent_spawn",
+      type: "agent_spawn", name: "test",
       id: "agent-1",
       palette: ["#ff0000", "#00ff00"],
     };

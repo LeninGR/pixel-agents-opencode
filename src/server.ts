@@ -75,6 +75,19 @@ export class PixelAgentsServer {
             layout: this.officeState.layout,
           }
           ws.send(JSON.stringify(layoutMsg))
+          // Send existing characters so late-connecting clients see current state
+          for (const ch of this.officeState.characters.values()) {
+            const spawnMsg: ServerMessage = {
+              type: "agent_spawn",
+              id: ch.id,
+              name: ch.name,
+              palette: ch.palette,
+              seatId: undefined,
+              col: ch.col,
+              row: ch.row,
+            }
+            ws.send(JSON.stringify(spawnMsg))
+          }
           // Also send backward compat state snapshot
           const snapshot = this.stateManager.getSnapshot()
           ws.send(JSON.stringify(snapshot))

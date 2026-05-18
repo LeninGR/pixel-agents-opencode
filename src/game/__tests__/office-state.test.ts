@@ -27,7 +27,7 @@ describe("addAgent", () => {
   });
 
   it("spawns agent at assigned seat", () => {
-    const agent = state.addAgent("agent-1", ["#ff0000"], 0);
+    const agent = state.addAgent("agent-1", "test", ["#ff0000"], 0);
     expect(agent.id).toBe("agent-1");
     expect(state.characters.has("agent-1")).toBe(true);
     // Agent should be at the seat position
@@ -38,14 +38,14 @@ describe("addAgent", () => {
   });
 
   it("auto-assigns seat when no seatId given", () => {
-    const agent = state.addAgent("auto-seat", ["#00ff00"]);
+    const agent = state.addAgent("auto-seat", "test", ["#00ff00"]);
     expect(agent).toBeDefined();
     expect(state.characters.has("auto-seat")).toBe(true);
   });
 
   it("finds nearest walkable tile if seat ID does not exist", () => {
     // seatId 9999 does not exist — agent auto-assigns first seat
-    const agent = state.addAgent("unknown-seat", ["#ff0000"], 9999);
+    const agent = state.addAgent("unknown-seat", "test", ["#ff0000"], 9999);
     expect(agent).toBeDefined();
     // Should be on a walkable tile (in bounds, not a wall)
     expect(agent.row).toBeGreaterThan(0);
@@ -58,7 +58,7 @@ describe("addAgent", () => {
     const messages: ServerMessage[] = [];
     state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("broadcast-test", ["#ff0000"], 0);
+    state.addAgent("broadcast-test", "test", ["#ff0000"], 0);
 
     expect(messages.length).toBe(1);
     expect(messages[0].type).toBe("agent_spawn");
@@ -71,7 +71,7 @@ describe("removeAgent", () => {
     const messages: ServerMessage[] = [];
     state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("to-remove", ["#ff0000"], 0);
+    state.addAgent("to-remove", "test", ["#ff0000"], 0);
     expect(state.characters.has("to-remove")).toBe(true);
 
     state.removeAgent("to-remove");
@@ -100,7 +100,7 @@ describe("setAgentActive / setAgentInactive", () => {
     const messages: ServerMessage[] = [];
     state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("active-test", ["#ff0000"], 0);
+    state.addAgent("active-test", "test", ["#ff0000"], 0);
     state.setAgentActive("active-test", 0);
 
     const activeMsg = messages.find((m) => m.type === "agent_active");
@@ -115,7 +115,7 @@ describe("setAgentActive / setAgentInactive", () => {
     const messages: ServerMessage[] = [];
     state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("idle-test", ["#ff0000"], 0);
+    state.addAgent("idle-test", "test", ["#ff0000"], 0);
     state.setAgentInactive("idle-test");
 
     const idleMsg = messages.find((m) => m.type === "agent_idle");
@@ -129,7 +129,7 @@ describe("setAgentActive / setAgentInactive", () => {
 describe("sub-agents", () => {
   it("addSubagent spawns near parent at adjacent walkable tile", () => {
     const state = makeState();
-    state.addAgent("parent", ["#ff0000"], 0);
+    state.addAgent("parent", "test", ["#ff0000"], 0);
 
     const sub = state.addSubagent("parent", "task-1");
     expect(sub).not.toBeNull();
@@ -148,7 +148,7 @@ describe("sub-agents", () => {
     const messages: ServerMessage[] = [];
     state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("parent", ["#ff0000"], 0);
+    state.addAgent("parent", "test", ["#ff0000"], 0);
     state.addSubagent("parent", "task-1");
     state.removeSubagent("parent", "task-1");
 
@@ -164,8 +164,8 @@ describe("agent count and state integrity", () => {
     const state = makeState();
     expect(state.characters.size).toBe(0);
 
-    state.addAgent("a", ["#f00"], 0);
-    state.addAgent("b", ["#0f0"], 1);
+    state.addAgent("a", "test", ["#f00"], 0);
+    state.addAgent("b", "test", ["#0f0"], 1);
     expect(state.characters.size).toBe(2);
 
     state.removeAgent("a");
@@ -180,7 +180,7 @@ describe("agent count and state integrity", () => {
       if (msg.type === "agent_spawn") capturedId = msg.id;
     });
 
-    const agent = state.addAgent("capture-test", ["#f00"], 0);
+    const agent = state.addAgent("capture-test", "test", ["#f00"], 0);
     expect(capturedId).toBe("capture-test");
   });
 });
@@ -188,7 +188,7 @@ describe("agent count and state integrity", () => {
 describe("update(dt)", () => {
   it("advances all walking characters", () => {
     const state = makeState();
-    const agent = state.addAgent("walker", ["#ff0000"], 0);
+    const agent = state.addAgent("walker", "test", ["#ff0000"], 0);
 
     // Assign a path manually
     agent.path = [
@@ -208,11 +208,11 @@ describe("subscribe / unsubscribe", () => {
     const messages: ServerMessage[] = [];
     const unsub = state.subscribe((msg) => messages.push(msg));
 
-    state.addAgent("sub-test", ["#ff0000"], 0);
+    state.addAgent("sub-test", "test", ["#ff0000"], 0);
     expect(messages.length).toBe(1);
 
     unsub();
-    state.addAgent("sub-test-2", ["#00ff00"], 1);
+    state.addAgent("sub-test-2", "test", ["#00ff00"], 1);
     expect(messages.length).toBe(1); // no new messages
   });
 });

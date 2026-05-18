@@ -42,17 +42,21 @@ export class OfficeState {
 
   addAgent(
     id: string,
+    name: string,
     palette: string[],
     seatId?: number,
   ): Character {
     const seat = this.resolveSeat(seatId);
-    const ch = createCharacter(id, palette, seat);
+    const ch = createCharacter(id, name, palette, seat);
     this.characters.set(id, ch);
     this.broadcast({
       type: "agent_spawn",
       id,
+      name,
       palette,
       seatId: seat.id,
+      col: ch.col,
+      row: ch.row,
     });
     return ch;
   }
@@ -90,7 +94,8 @@ export class OfficeState {
       direction: parent.direction,
     };
 
-    const sub = createCharacter(subId, [...parent.palette], seat);
+    const subName = `${parent.name}-sub`;
+    const sub = createCharacter(subId, subName, [...parent.palette], seat);
     this.characters.set(subId, sub);
     this.subagentMap.set(subId, parentId);
 
@@ -99,6 +104,7 @@ export class OfficeState {
       parentId,
       toolId,
       id: subId,
+      name: subName,
     });
 
     return sub;

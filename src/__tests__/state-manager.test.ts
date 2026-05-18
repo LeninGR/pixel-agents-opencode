@@ -78,7 +78,7 @@ describe("OfficeState lifecycle (event → broadcast)", () => {
     const { messages } = subscribeAndCapture(office);
 
     const palette = ["#ff0000", "#00ff00", "#0000ff"];
-    const ch = office.addAgent("session-123", palette, 0);
+    const ch = office.addAgent("session-123", "test", palette, 0);
 
     expect(messages).toHaveLength(1);
     const msg = messages[0] as Extract<ServerMessage, { type: "agent_spawn" }>;
@@ -94,7 +94,7 @@ describe("OfficeState lifecycle (event → broadcast)", () => {
     const office = new OfficeState(createDefaultLayout(20, 11));
     const { messages } = subscribeAndCapture(office);
 
-    office.addAgent("session-abc", ["#fff"]);
+    office.addAgent("session-abc", "test", ["#fff"]);
     messages.length = 0; // clear spawn message
 
     office.removeAgent("session-abc");
@@ -149,7 +149,7 @@ describe("OfficeState lifecycle (event → broadcast)", () => {
     const { messages } = subscribeAndCapture(office);
 
     // Spawn parent first
-    const parent = office.addAgent("parent-session", ["#aaa"], 0);
+    const parent = office.addAgent("parent-session", "test", ["#aaa"], 0);
     messages.length = 0; // clear spawn
 
     const sub = office.addSubagent("parent-session", "task-1");
@@ -176,7 +176,7 @@ describe("OfficeState lifecycle (event → broadcast)", () => {
     const office = new OfficeState(createDefaultLayout(20, 11));
     const { messages } = subscribeAndCapture(office);
 
-    office.addAgent("parent-session", ["#aaa"], 0);
+    office.addAgent("parent-session", "test", ["#aaa"], 0);
     office.addSubagent("parent-session", "task-1");
     messages.length = 0; // clear spawn messages
 

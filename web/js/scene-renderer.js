@@ -1,4 +1,6 @@
 import { renderTiles } from "./tile-renderer.js";
+import { generateFurnitureSprite } from "./furniture-sprites.js";
+import { getCharacterSprite, drawSprite } from "./character-sprites.js";
 
 const TILE_SIZE = 16;
 
@@ -35,10 +37,10 @@ export function pixelAlign(value, zoom) {
 /**
  * Composite all layers onto the canvas in z-order:
  *   1. Floor tiles (bottom)
- *   2. Furniture
+ *   2. Furniture sprites
  *   3. Characters (sorted by Y = higher row → drawn later → on top)
- *   4. Dissolve particles (between characters and UI)
- *   5. Bubbles / UI (top)
+ *   4. Dissolve particles
+ *   5. Bubbles / name labels (top)
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} state — { layout, characters: Map<string, object>, bubbles: object[], dissolveEffect? }
@@ -56,7 +58,14 @@ export function renderScene(ctx, state, camera) {
   // ── 1. Floor tiles ──────────────────────────────────────────────────────
   renderTiles(ctx, layout, cam);
 
-  // ── 2. Characters (z-sorted by Y position) ──────────────────────────────
+  // ── 2. Furniture sprites ─────────────────────────────────────────────────
+  if (layout && layout.furniture && layout.furniture.length > 0) {
+    for (const placed of layout.furniture) {
+      renderFurniture(ctx, placed, cam);
+    }
+  }
+
+  // ── 3. Characters (z-sorted by Y position) ──────────────────────────────
   if (characters && characters.size > 0) {
     // Collect and sort by row (Y-axis). Lower row = further back = drawn first.
     const charList = Array.from(characters.values());
@@ -67,17 +76,64 @@ export function renderScene(ctx, state, camera) {
     }
   }
 
-  // ── 3. Dissolve particles ───────────────────────────────────────────────
+  // ── 4. Dissolve particles ───────────────────────────────────────────────
   // Use either the state's dissolveEffect or the module-scoped fallback
   const dissolve = dissolveEffect || _dissolveEffect;
   if (dissolve && dissolve.isActive()) {
     dissolve.render(ctx, cam);
   }
 
-  // ── 4. Bubbles / UI (drawn on top of everything) ────────────────────────
+  // ── 5. Bubbles / name labels (drawn on top of everything) ───────────────
   if (bubbles && bubbles.length > 0) {
     for (const bubble of bubbles) {
       renderBubble(ctx, bubble, cam);
+    }
+  }
+}
+
+// ── Furniture rendering ──────────────────────────────────────────────────────
+
+/** Multi-tile sizes for furniture types (tiles wide × tiles tall). */
+const FURNITURE_SIZE = {
+  desk:  { w: 2, h: 1 },
+  chair: { w: 1, h: 1 },
+  wall:  { w: 1, h: 1 },
+};
+
+/**
+ * Render a furniture sprite across its full footprint.
+ * Desks span 2 tiles horizontally, chairs 1 tile, walls 1 tile.
+ */
+function renderFurniture(ctx, placed, cam) {
+  const sprite = generateFurnitureSprite(placed.type);
+  if (!sprite || !sprite.pixels) return;
+
+  const tilePx = TILE_SIZE * cam.zoom;
+  const size = FURNITURE_SIZE[placed.type] || { w: 1, h: 1 };
+  const totalW = tilePx * size.w;
+  const totalH = tilePx * size.h;
+  const screenX = placed.col * tilePx - cam.x;
+  const screenY = placed.row * tilePx - cam.y;
+
+  const rows = sprite.pixels.length;
+  const cols = sprite.pixels[0].length;
+
+  // Scale each sprite pixel to fill the total footprint area
+  const pxW = totalW / cols;
+  const pxH = totalH / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const color = sprite.pixels[r][c];
+      if (!color) continue;
+
+      ctx.fillStyle = color;
+      ctx.fillRect(
+        Math.round(screenX + c * pxW),
+        Math.round(screenY + r * pxH),
+        Math.ceil(pxW),
+        Math.ceil(pxH),
+      );
     }
   }
 }
@@ -96,32 +152,57 @@ function renderCharacter(ctx, ch, cam) {
   const screenX = ch.col * tilePx - cam.x;
   const screenY = ch.row * tilePx - cam.y;
 
-  // Try to use cached sprite from SpriteCache (if available)
-  // In the full integration, the scene renderer will use the sprite cache.
-  // For now, draw a colored rectangle placeholder for the character.
   const palette = ch.palette;
-  const shirtColor = (typeof palette === "object" && !Array.isArray(palette))
-    ? (palette.shirt || "#7f8c8d")
-    : (Array.isArray(palette) ? (palette[2] || "#7f8c8d") : "#7f8c8d");
+  if (!palette || !Array.isArray(palette)) return;
 
-  // Body rectangle
-  const bodyHeight = tilePx * 0.7;
-  const bodyY = screenY + tilePx * 0.15;
-  ctx.fillStyle = shirtColor;
-  ctx.fillRect(screenX + tilePx * 0.15, bodyY, tilePx * 0.7, bodyHeight);
+  const spriteData = getCharacterSprite(palette);
+  const frame = (ch.frame || 0) % 60;
+  // Alternate between idle and walk frames
+  const sprite = frame % 20 < 10 ? spriteData.idle : spriteData.walk1;
 
-  // Head circle (approximated as rect in pixel style)
-  const headSize = tilePx * 0.4;
-  const skinColor = (typeof palette === "object" && !Array.isArray(palette))
-    ? (palette.skin || "#f4c08e")
-    : (Array.isArray(palette) ? (palette[0] || "#f4c08e") : "#f4c08e");
-  ctx.fillStyle = skinColor;
-  ctx.fillRect(
-    screenX + tilePx * 0.25,
-    screenY - headSize * 0.3,
-    headSize * 1.2,
-    headSize,
-  );
+  // Sprite is 16 wide × 32 tall. Draw feet at bottom of tile.
+  const pxSize = tilePx / 16;
+  const spriteW = 16 * pxSize;
+  const spriteH = 32 * pxSize;
+  const drawX = screenX;
+  const drawY = screenY + tilePx - spriteH; // feet at bottom of tile
+
+  drawSprite(ctx, sprite, drawX, drawY, pxSize);
+
+  // ── Name label ────────────────────────────────────────────────────────
+  const name = ch.name || formatAgentName(ch.id);
+  const fontSize = Math.max(8, tilePx * 0.15);
+  ctx.font = `bold ${fontSize}px monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  // Position label just above the head (head starts ~row 2 of 32-row sprite)
+  const labelY = drawY + pxSize * 2 - 2;
+  const labelW = (ctx.measureText ? ctx.measureText(name).width : name.length * fontSize * 0.6) + 6;
+
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(screenX + spriteW / 2 - labelW / 2, labelY - fontSize - 2, labelW, fontSize + 4);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(name, screenX + spriteW / 2, labelY);
+}
+
+/**
+ * Format a session ID into a readable display name.
+ * @param {string} id
+ * @returns {string}
+ */
+function formatAgentName(id) {
+  if (!id) return "???";
+  // If it contains a known agent name pattern (kebab-case or dot-separated), use last part
+  const parts = id.split(/[-.]/);
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1];
+    // If last part looks like a short hash, use the meaningful part
+    if (/^[a-f0-9]{6,}$/i.test(lastPart) && parts.length >= 3) {
+      return parts.slice(0, -1).join("-").substring(0, 18);
+    }
+    return id.substring(0, 20);
+  }
+  return id.substring(0, 16);
 }
 
 // ── Bubble rendering ─────────────────────────────────────────────────────────

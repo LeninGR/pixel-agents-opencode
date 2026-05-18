@@ -1,5 +1,9 @@
 // ── Client OfficeState mirror ─────────────────────────────────────────────────
 
+import { startGameLoop } from "./game-loop.js";
+import { renderScene, clampZoom } from "./scene-renderer.js";
+import { DissolveEffect } from "./dissolve-effect.js";
+
 /**
  * Client-side office state.
  * Mirrors the server's OfficeState via WebSocket messages.
@@ -30,8 +34,11 @@ export class OfficinaApp {
    */
   constructor(canvas) {
     this.canvas = canvas;
+    this.dissolveEffect = new DissolveEffect();
     this.connectWebSocket();
     this.setupCanvasResize();
+    this.setupZoomControls();
+    this.startLoop();
   }
 
   // ── WebSocket ────────────────────────────────────────────────────────────
@@ -46,6 +53,7 @@ export class OfficinaApp {
 
       this.ws.onopen = () => {
         // Connected — layout will be sent by server
+        this.updateStatus("Connected", true);
       };
 
       this.ws.onmessage = (event) => {
@@ -58,6 +66,7 @@ export class OfficinaApp {
       };
 
       this.ws.onclose = () => {
+        this.updateStatus("Disconnected", false);
         // Reconnect after delay
         if (typeof setTimeout !== "undefined") {
           setTimeout(() => this.connectWebSocket(), 3000);
@@ -65,6 +74,7 @@ export class OfficinaApp {
       };
 
       this.ws.onerror = () => {
+        this.updateStatus("Disconnected", false);
         // Error — will trigger onclose → reconnect
       };
     } catch {
@@ -126,13 +136,14 @@ export class OfficinaApp {
   // ── Agent lifecycle ─────────────────────────────────────────────────────
 
   handleAgentSpawn(msg) {
-    const { id, palette, seatId } = msg;
-    // Default position if no seat known
-    const col = 10;
-    const row = 5;
+    const { id, name, palette, seatId, col: msgCol, row: msgRow } = msg;
+    // Use server-provided position, or default
+    const col = msgCol ?? 10;
+    const row = msgRow ?? 5;
 
     this.characters.set(id, {
       id,
+      name: name || id,
       palette,
       col,
       row,
@@ -176,13 +187,14 @@ export class OfficinaApp {
   }
 
   handleSubagentSpawn(msg) {
-    const { parentId, id } = msg;
+    const { parentId, id, name } = msg;
     const parent = this.characters.get(parentId);
     const col = parent ? parent.col + 1 : 10;
     const row = parent ? parent.row : 5;
 
     this.characters.set(id, {
       id,
+      name: name || id,
       palette: parent ? [...parent.palette] : ["#f4c08e", "#3d2b1f", "#7f8c8d", "#2c3e50", "#bdc3c7", "#2c3e50"],
       col,
       row,
@@ -246,6 +258,86 @@ export class OfficinaApp {
       window.addEventListener("resize", resize);
     }
     resize();
+  }
+
+  // ── Zoom controls ───────────────────────────────────────────────────────
+
+  setupZoomControls() {
+    if (typeof document === "undefined") return;
+
+    const zoomInBtn = document.getElementById("zoom-in-btn");
+    const zoomOutBtn = document.getElementById("zoom-out-btn");
+    const zoomLabel = document.getElementById("zoom-label");
+
+    const updateLabel = () => {
+      if (zoomLabel) zoomLabel.textContent = `${this.camera.zoom}×`;
+    };
+
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener("click", () => {
+        this.camera.zoom = clampZoom(this.camera.zoom + 1);
+        updateLabel();
+      });
+    }
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener("click", () => {
+        this.camera.zoom = clampZoom(this.camera.zoom - 1);
+        updateLabel();
+      });
+    }
+    updateLabel();
+  }
+
+  // ── Status indicator ─────────────────────────────────────────────────────
+
+  /**
+   * Update the connection status in the UI.
+   * @param {string} text
+   * @param {boolean} connected
+   */
+  updateStatus(text, connected) {
+    if (typeof document === "undefined") return;
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    if (statusText) statusText.textContent = text;
+    if (statusDot) {
+      statusDot.style.backgroundColor = connected ? "#4caf50" : "#f44336";
+    }
+  }
+
+  // ── Game loop ─────────────────────────────────────────────────────────────
+
+  /**
+   * Build a state snapshot for the scene renderer.
+   */
+  getState() {
+    return {
+      layout: this.layout,
+      characters: this.characters,
+      bubbles: this.bubbles,
+      dissolveEffect: this.dissolveEffect,
+    };
+  }
+
+  /**
+   * Start the requestAnimationFrame game loop.
+   */
+  startLoop() {
+    if (typeof requestAnimationFrame === "undefined") return;
+
+    this._stopLoop = startGameLoop(
+      // update
+      (dt) => {
+        this.update(dt);
+        if (this.dissolveEffect) this.dissolveEffect.update(dt);
+      },
+      // render
+      (ctx) => {
+        renderScene(ctx, this.getState(), this.camera);
+      },
+      // getCtx
+      () => this.canvas ? this.canvas.getContext("2d") : null,
+    );
   }
 
   // ── Update tick ──────────────────────────────────────────────────────────
