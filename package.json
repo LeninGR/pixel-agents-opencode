@@ -15,7 +15,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --out-dir dist && cp -r web dist/web",
+    "build": "tsup src/index.ts --format esm --dts --out-dir dist && rm -rf dist/web && cp -r web dist/web",
     "typecheck": "tsc --noEmit",
     "dev": "tsup src/index.ts --format esm --dts --out-dir dist --watch",
     "clean": "rm -rf dist",
