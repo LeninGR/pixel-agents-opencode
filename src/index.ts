@@ -54,9 +54,43 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
   const stateManager = new StateManager();
   const server = new PixelAgentsServer(stateManager, { port: DEFAULT_PORT, host: '127.0.0.1' });
   const sessionAgentMap = new Map<string, string>();
+  const sessionInfoCache = new Map<
+    string,
+    { projectName: string; sessionTitle: string; directory: string }
+  >();
+  let sessionSeatCounter = 0; // assigns different work desks per session
 
   function getAgentNameForSession(sessionID: string): string {
     return sessionAgentMap.get(sessionID) || sessionID;
+  }
+
+  /** Get session info from SDK, cached. */
+  async function getSessionInfo(
+    sessionID: string,
+  ): Promise<{ projectName: string; sessionTitle: string; directory: string }> {
+    const cached = sessionInfoCache.get(sessionID);
+    if (cached) return cached;
+
+    try {
+      const result = await ctx.client.session.get({ path: { id: sessionID } });
+      const session = (result as { data?: { title?: string; directory?: string } })?.data;
+      const directory = session?.directory || '';
+      const projectName = directory.split('/').filter(Boolean).pop() || directory;
+      const sessionTitle = session?.title || sessionID;
+      const info = { projectName, sessionTitle, directory };
+      sessionInfoCache.set(sessionID, info);
+      return info;
+    } catch {
+      const fallback = { projectName: sessionID, sessionTitle: sessionID, directory: '' };
+      sessionInfoCache.set(sessionID, fallback);
+      return fallback;
+    }
+  }
+
+  /** Assign a work desk seat per session (round-robin across 4 desks: seat 0-3) */
+  function assignSessionSeat(_sessionID: string): number {
+    // Map 4 work desks (0-3), 3 rest chairs (4-6)
+    return sessionSeatCounter++ % 4;
   }
 
   try {
@@ -102,6 +136,7 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
 
         if (sessionID && typeof sessionID === 'string' && !sessionID.startsWith('msg_')) {
           const agentName = getAgentNameForSession(sessionID);
+          const info = await getSessionInfo(sessionID);
           stateManager.setAgentAction(
             agentName,
             event.type === 'session.idle' ? 'idle' : 'thinking',
@@ -113,6 +148,10 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
             sessionID,
             agentName,
             palette: paletteForSession(sessionID),
+            projectName: info.projectName,
+            sessionTitle: info.sessionTitle,
+            directory: info.directory,
+            seatId: assignSessionSeat(sessionID),
           });
         }
       }
@@ -121,12 +160,17 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     'chat.message': async ({ sessionID, agent }) => {
       const agentName = safeAgentName(agent, sessionID);
       sessionAgentMap.set(sessionID, agentName);
+      const info = await getSessionInfo(sessionID);
       stateManager.setAgentAction(agentName, 'thinking', 'Composing response');
       server.broadcast({
         type: 'agent_spawn',
         id: sessionID,
         name: agentName,
         palette: paletteForSession(sessionID),
+        projectName: info.projectName,
+        sessionTitle: info.sessionTitle,
+        directory: info.directory,
+        seatId: assignSessionSeat(sessionID),
       });
     },
 
