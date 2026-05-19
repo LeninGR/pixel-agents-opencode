@@ -1,174 +1,244 @@
-<h1 align="center">
-    <a href="https://github.com/pablodelucca/pixel-agents/discussions">
-        <img src="webview-ui/public/banner.png" alt="Pixel Agents">
-    </a>
-</h1>
+# Pixel Agents — OpenCode Plugin
 
-<h2 align="center" style="padding-bottom: 20px;">
-  The game interface where AI agents build real things
-</h2>
+**Visualiza tus agentes de OpenCode como personajes pixel art en una oficina virtual.**  
+Cada sesión, cada sub-agente SDD, cada herramienta — todo visible en tiempo real.
 
-<div align="center" style="margin-top: 25px;">
+Basado en el motor visual de [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) (7.5k ⭐), adaptado como plugin nativo para OpenCode.
 
-[![version](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fpablodelucca%2F3cd28398fa4a2c0a636e1d51d41aee39%2Fraw%2Fversion.json)](https://github.com/pablodelucca/pixel-agents/releases)
-[![marketplaces](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fpablodelucca%2F3cd28398fa4a2c0a636e1d51d41aee39%2Fraw%2Finstalls.json)](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents)
-[![stars](https://img.shields.io/github/stars/pablodelucca/pixel-agents?logo=github&color=0183ff&style=flat)](https://github.com/pablodelucca/pixel-agents/stargazers)
-[![license](https://img.shields.io/github/license/pablodelucca/pixel-agents?color=0183ff&style=flat)](https://github.com/pablodelucca/pixel-agents/blob/main/LICENSE)
-[![good first issues](https://img.shields.io/github/issues/pablodelucca/pixel-agents/good%20first%20issue?color=7057ff&label=good%20first%20issues)](https://github.com/pablodelucca/pixel-agents/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
+---
 
-</div>
+## 🏗️ Arquitectura
 
-<div align="center">
-<a href="https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents">🛒 VS Code Marketplace</a> • <a href="https://github.com/pablodelucca/pixel-agents/discussions">💬 Discussions</a> • <a href="https://github.com/pablodelucca/pixel-agents/issues">🐛 Issues</a> • <a href="CONTRIBUTING.md">🤝 Contributing</a> • <a href="CHANGELOG.md">📋 Changelog</a>
-</div>
-
-<br/>
-
-Pixel Agents turns multi-agent AI systems into something you can actually see and manage. Each agent becomes a character in a pixel art office. They walk around, sit at their desk, and visually reflect what they are doing — typing when writing code, reading when searching files, waiting when it needs your attention.
-
-Right now it works as a VS Code extension with Claude Code. The vision though, is a fully agent-agnostic, platform-agnostic interface for orchestrating any AI agents, deployable anywhere.
-
-This is the source code for the free Pixel Agents extension for VS Code — install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) or [Open VSX](https://open-vsx.org/extension/pablodelucca/pixel-agents) with the full furniture catalog included.
-
-![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
-
-## Features
-
-- **One agent, one character** — every Claude Code terminal gets its own animated character
-- **Live activity tracking** — characters animate based on what the agent is actually doing (writing, reading, running commands)
-- **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
-- **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
-- **Sound notifications** — optional chime when an agent finishes its turn
-- **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
-- **Persistent layouts** — your office design is saved and shared across VS Code windows
-- **External asset directories** — load custom or third-party furniture packs from any folder on your machine
-- **Diverse characters** — 6 diverse characters. These are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
-
-<p align="center">
-  <img src="webview-ui/public/characters.png" alt="Pixel Agents characters" width="320" height="72" style="image-rendering: pixelated;">
-</p>
-
-## Requirements
-
-- VS Code 1.105.0 or later
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured
-- **Platform**: Windows, Linux, and macOS are supported
-
-## Getting Started
-
-If you just want to use Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
-
-### Install from source
-
-```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
-cd pixel-agents
-npm install
-cd webview-ui && npm install && cd ..
-npm run build
+```
+┌──────────────────────────────────────────────────────────┐
+│                      OpenCode                            │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  PixelAgentsPlugin (src/index.ts)                │   │
+│  │  • Event hooks (session.*, chat.message, tool.*) │   │
+│  │  • Palette system (8 human tones per session)    │   │
+│  │  • StateManager (agent action tracking)          │   │
+│  └──────────────┬───────────────────────────────────┘   │
+│                 │ Bun.serve()                            │
+│  ┌──────────────▼───────────────────────────────────┐   │
+│  │  PixelAgentsServer (src/server.ts)               │   │
+│  │  • HTTP :3456 — sirve webview (React + Canvas)   │   │
+│  │  • WebSocket /ws — eventos de agentes en tiempo real│ │
+│  └──────────────┬───────────────────────────────────┘   │
+└─────────────────┼───────────────────────────────────────┘
+                  │ WebSocket
+┌─────────────────▼───────────────────────────────────────┐
+│  Navegador (http://127.0.0.1:3456)                      │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  opencode-bridge.js                              │   │
+│  │  WebSocket → MessageEvent → React hooks          │   │
+│  └──────────────┬───────────────────────────────────┘   │
+│  ┌──────────────▼───────────────────────────────────┐   │
+│  │  Pixel Agents Webview (React 19 + Canvas 2D)     │   │
+│  │  • Metro City characters (JIK-A-4)               │   │
+│  │  • Furniture PNGs + manifest system              │   │
+│  │  • Layout editor (walls, floors, desks, chairs)  │   │
+│  │  • BFS pathfinding, z-sorting, game loop         │   │
+│  └──────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Then press **F5** in VS Code to launch the Extension Development Host.
+### Ciclo de vida de un agente
 
-### Usage
+```
+OpenCode inicia
+  │
+  ▼
+session.status ──→ plugin detecta ──→ server.broadcast("agent_spawn") ──→ bridge ──→ webview
+  │                                                                                    │
+  ▼                                                                                    ▼
+chat.message ──→ plugin confirma ──→ server.broadcast("agent_tool")      personaje aparece en la oficina
+  │                                                                      (paleta fija por nombre)
+  ▼
+tool.execute.before ──→ plugin detecta herramienta ──→ animación (typing/reading/bash)
+  │
+  ▼
+session.idle ──→ agente se va al rest room (nunca desaparece)
+```
 
-1. Open the **Pixel Agents** panel (it appears in the bottom panel area alongside your terminal)
-2. Click **+ Agent** to spawn a new Claude Code terminal and its character. Right-click for the option to launch with `--dangerously-skip-permissions` (bypasses all tool approval prompts)
-3. Start coding with Claude — watch the character react in real time
-4. Click a character to select it, then click a seat to reassign it
-5. Click **Layout** to open the office editor and customize your space
+### Sub-agentes SDD
 
-## Layout Editor
+Cuando el orquestador lanza fases SDD (`/sdd-propose`, `/sdd-apply`, etc.) se crean sub-agentes:
 
-The built-in editor lets you design your office:
+```
+gentle-orchestrator ──task──→ gentle-sdd-spec    (char_1)
+                    ──task──→ gentle-sdd-apply   (char_2)
+                    ──task──→ gentle-sdd-verify  (char_3)
+```
 
-- **Floor** — Full HSB color control
-- **Walls** — Auto-tiling walls with color customization
-- **Tools** — Select, paint, erase, place, eyedropper, pick
-- **Undo/Redo** — 50 levels with Ctrl+Z / Ctrl+Y
-- **Export/Import** — Share layouts as JSON files via the Settings modal
+Cada sub-agente tiene su propio personaje Metro City y aparece junto al padre.
 
-The grid is expandable up to 64×64 tiles. Click the ghost border outside the current grid to grow it.
+---
 
-### Office Assets
+## 📦 Estructura del proyecto
 
-All office assets (furniture, floors, walls) are now **fully open-source** and included in this repository under `webview-ui/public/assets/`. No external purchases or imports are needed — everything works out of the box.
+```
+pixel-agents-opencode/
+├── src/                          # Capa OpenCode (nuestra)
+│   ├── index.ts                  # Plugin entry: hooks, paletas, sesiones
+│   ├── server.ts                 # Bun WebSocket + HTTP server
+│   ├── state-manager.ts          # Tracking de acciones de agentes
+│   ├── opencode-types.ts         # Tipos específicos de OpenCode
+│   └── __tests__/                # 14 tests (vitest)
+│
+├── webview-ui/                   # Frontend (pablodelucca)
+│   ├── src/
+│   │   ├── App.tsx               # Composición React
+│   │   ├── hooks/                # useExtensionMessages, useEditorActions
+│   │   ├── office/
+│   │   │   ├── engine/           # Game loop, Canvas 2D, BFS, FSM
+│   │   │   ├── sprites/          # Metro City characters, sprite cache
+│   │   │   ├── editor/           # Layout editor (undo/redo, paint, place)
+│   │   │   └── layout/           # Furniture catalog, tile map
+│   │   └── components/           # Toolbar, Settings, Zoom, Tooltip
+│   └── public/assets/
+│       ├── characters/           # 6 PNGs Metro City (112×96px c/u)
+│       ├── furniture/            # Muebles PNG + manifest.json
+│       ├── floors/               # Patrones de piso PNG
+│       └── walls/                # Auto-tile walls PNG
+│
+├── server/                       # Claude Code hooks (pablodelucca)
+├── shared/assets/                # Utilidades de assets (pablodelucca)
+├── scripts/                      # Herramientas: asset-manager, wall editor
+├── dist/                         # Build output
+│   ├── plugin.js                 # Bundle del plugin (8.5 KB)
+│   └── web/                      # Webview build (Vite, 293 KB)
+├── standalone.mjs                # Servidor Node.js para desarrollo
+└── package.json                  # main: "dist/plugin.js"
+```
 
-Each furniture item lives in its own folder under `assets/furniture/` with a `manifest.json` that declares its sprites, rotation groups, state groups (on/off), and animation frames. Floor tiles are individual PNGs in `assets/floors/`, and wall tile sets are in `assets/walls/`. This modular structure makes it easy to add, remove, or modify assets without touching any code.
+---
 
-To add a new furniture item, create a folder in `webview-ui/public/assets/furniture/` with your PNG sprite(s) and a `manifest.json`, then rebuild. The asset manager (`scripts/asset-manager.html`) provides a visual editor for creating and editing manifests.
+## 🚀 Instalación y uso
 
-To use furniture from an external directory, open Settings → **Add Asset Directory**. See [docs/external-assets.md](docs/external-assets.md) for the full manifest format and how to use third-party asset packs.
+### Requisitos
 
-Characters are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
+- [OpenCode](https://github.com/opencode-ai/opencode) instalado
+- Node.js 22+ (para build y servidor standalone)
+- npm
 
-## How It Works
+### Build
 
-Pixel Agents watches Claude Code's JSONL transcript files to track what each agent is doing. When an agent uses a tool (like writing a file or running a command), the extension detects it and updates the character's animation accordingly. No modifications to Claude Code are needed — it's purely observational.
+```bash
+git clone https://github.com/LeninGR/pixel-agents-opencode.git
+cd pixel-agents-opencode
+npm install
+cd webview-ui && npm install && cd ..
+npm run build:webview    # Vite → dist/web/
+npm run build:opencode   # tsup → dist/plugin.js
+```
 
-The webview runs a lightweight game loop with canvas rendering, BFS pathfinding, and a character state machine (idle → walk → type/read). Everything is pixel-perfect at integer zoom levels.
+### Configurar en OpenCode
 
-## Tech Stack
+Agregá la ruta del proyecto en `~/.config/opencode/opencode.json`:
 
-- **Extension**: TypeScript, VS Code Webview API, esbuild
-- **Webview**: React 19, TypeScript, Vite, Canvas 2D
+```json
+{
+  "plugin": ["/ruta/a/pixel-agents-opencode"]
+}
+```
 
-## Known Limitations
+Reiniciá OpenCode. El plugin carga automáticamente y levanta el servidor en `http://127.0.0.1:3456`.
 
-- **Agent-terminal sync** — the way agents are connected to Claude Code terminal instances is not super robust and sometimes desyncs, especially when terminals are rapidly opened/closed or restored across sessions.
-- **Heuristic-based status detection** — Claude Code's JSONL transcript format does not provide clear signals for when an agent is waiting for user input or when it has finished its turn. The current detection is based on heuristics (idle timers, turn-duration events) and often misfires — agents may briefly show the wrong status or miss transitions.
-- **Linux/macOS tip** — if you launch VS Code without a folder open (e.g. bare `code` command), agents will start in your home directory. This is fully supported; just be aware your Claude sessions will be tracked under `~/.claude/projects/` using your home directory as the project root.
+### Modo desarrollo (sin OpenCode)
 
-## Troubleshooting
+Si querés probar el webview sin OpenCode:
 
-If your agent appears stuck on idle or doesn't spawn:
+```bash
+node standalone.mjs
+# Abrí http://127.0.0.1:3456
+```
 
-1. **Debug View** — In the Pixel Agents panel, click the gear icon (Settings), then toggle **Debug View**. This shows connection diagnostics per agent: JSONL file status, lines parsed, last data timestamp, and file path. If you see "JSONL not found", the extension can't locate the session file.
-2. **Debug Console** — If you're running from source (Extension Development Host via F5), open VS Code's **View > Debug Console**. Search for `[Pixel Agents]` to see detailed logs: project directory resolution, JSONL polling status, path encoding mismatches, and unrecognized JSONL record types.
+Esto levanta un servidor Node.js con WebSocket que sirve el webview y acepta eventos vía API:
 
-## Where This Is Going
+```bash
+curl -X POST http://127.0.0.1:3456/api/broadcast \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"agent_spawn","id":"test","name":"Test","palette":["#f0c8a0","#3d2010","#cc4444","#2a2a3a"]}'
+```
 
-The long-term vision is an interface where managing AI agents feels like playing the Sims, but the results are real things built.
+---
 
-- **Agents as characters** you can see, assign, monitor, and redirect, each with visible roles (designer, coder, writer, reviewer), stats, context usage, and tools.
-- **Desks as directories** — drag an agent to a desk to assign it to a project or working directory.
-- **An office as a project** — with a Kanban board on the wall where idle agents can pick up tasks autonomously.
-- **Deep inspection** — click any agent to see its model, branch, system prompt, and full work history. Interrupt it, chat with it, or redirect it.
-- **Token health bars** — rate limits and context windows visualized as in-game stats.
-- **Fully customizable** — upload your own character sprites, themes, and office assets. Eventually maybe even move beyond pixel art into 3D or VR.
+## 🎨 Asignación de personajes
 
-For this to work, the architecture needs to be modular at every level:
+Cada agente de OpenCode tiene un personaje Metro City fijo según su nombre:
 
-- **Platform-agnostic**: VS Code extension today, Electron app, web app, or any other host environment tomorrow.
-- **Agent-agnostic**: Claude Code today, but built to support Codex, OpenCode, Gemini, Cursor, Copilot, and others through composable adapters.
-- **Theme-agnostic**: community-created assets, skins, and themes from any contributor.
+| Agente                | Personaje | Sprite                         |
+| --------------------- | --------- | ------------------------------ |
+| `gentle-orchestrator` | char_4    | `assets/characters/char_4.png` |
+| `gentle-sdd-spec`     | char_1    | `assets/characters/char_1.png` |
+| `gentle-sdd-apply`    | char_2    | `assets/characters/char_2.png` |
+| `gentle-sdd-verify`   | char_3    | `assets/characters/char_3.png` |
+| `gentle-sdd-design`   | char_0    | `assets/characters/char_0.png` |
+| `gentle-sdd-tasks`    | char_5    | `assets/characters/char_5.png` |
+| _otros_               | rotativo  | (0-5 automático)               |
 
-We're actively working on the core module and adapter architecture that makes this possible. If you're interested to talk about this further, please visit our [Discussions Section](https://github.com/pablodelucca/pixel-agents/discussions).
+Definido en `dist/web/opencode-bridge.js` → `NAME_PALETTE`.
 
+### Agregar personajes nuevos
 
-## Community & Contributing
+1. Creá el sprite sheet: **112×96px** PNG, 7 frames × 16px, 3 direcciones × 32px
+2. Guardalo en `webview-ui/public/assets/characters/char_6.png`
+3. Actualizá `PALETTE_COUNT` en `shared/assets/constants.ts`
+4. Agregalo al array `characters` en `asset-index.json`
+5. Rebuild: `cd webview-ui && npx vite build --outDir ../dist/web`
+6. Agregá el mapeo en `NAME_PALETTE` del bridge
 
-Use **[Issues](https://github.com/pablodelucca/pixel-agents/issues)** to report bugs or request features. Join **[Discussions](https://github.com/pablodelucca/pixel-agents/discussions)** for questions and conversations.
+Para crear sprites: [Piskel](https://www.piskelapp.com/) (gratis, online), [Aseprite](https://www.aseprite.org/), [LibreSprite](https://libresprite.github.io/).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
+---
 
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+## 🔧 Sistema de paletas
 
-## Supporting the Project
+El plugin asigna una paleta de 4 colores a cada sesión (persistente):
 
-If you find Pixel Agents useful, consider supporting its development:
+```
+palette[0] = tono de piel   (ej. #f0c8a0)
+palette[1] = color de pelo  (ej. #3d2010)
+palette[2] = color de camisa (ej. #cc4444)
+palette[3] = color de pantalón (ej. #2a2a3a)
+```
 
-<a href="https://github.com/sponsors/pablodelucca">
-  <img src="https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=github" alt="GitHub Sponsors">
-</a>
-<a href="https://ko-fi.com/pablodelucca">
-  <img src="https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi" alt="Ko-fi">
-</a>
+8 paletas predefinidas en `src/index.ts` → `PALETTE_POOL`. La misma sesión siempre recibe la misma paleta (`sessionPaletteMap`).
 
-## Star History
+---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=pablodelucca/pixel-agents&type=Date)](https://www.star-history.com/?repos=pablodelucca%2Fpixel-agents&type=date&legend=bottom-right)
+## 📡 Protocolo WebSocket
 
-## License
+El servidor envía estos mensajes al webview:
 
-This project is licensed under the [MIT License](LICENSE).
+| Mensaje         | Disparador          | Datos                                               |
+| --------------- | ------------------- | --------------------------------------------------- |
+| `state_update`  | StateManager cambia | `{ agents: { [name]: { action, detail, since } } }` |
+| `agent_spawn`   | chat.message        | `{ id, name, palette }`                             |
+| `session_event` | session.\*          | `{ eventType, sessionID, agentName, palette }`      |
+| `agent_tool`    | tool.execute        | `{ id, name, tool }`                                |
+
+El bridge (`opencode-bridge.js`) traduce estos a `MessageEvent` que el webview React consume.
+
+---
+
+## 🧪 Tests
+
+```bash
+npm test                 # 14 tests OpenCode (vitest)
+cd webview-ui && npm test  # tests del webview
+```
+
+---
+
+## 📚 Créditos
+
+- **Motor visual**: [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) — MIT License
+- **Personajes**: [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)
+- **Integración OpenCode**: [LeninGR/pixel-agents-opencode](https://github.com/LeninGR/pixel-agents-opencode)
+
+---
+
+## 📄 Licencia
+
+MIT License — ver [LICENSE](LICENSE).
