@@ -48,17 +48,17 @@ jobs:
 
       - name: Install Root Dependencies
         id: install_root
-        run: npm ci
+        run: npm install
 
       - name: Install Webview Dependencies
         id: install_webview
         working-directory: webview-ui
-        run: npm ci
+        run: npm install
 
       - name: Install Server Dependencies
         id: install_server
         working-directory: server
-        run: npm ci
+        run: npm install
 
       # --- Quality Checks (blocking) ---
 
