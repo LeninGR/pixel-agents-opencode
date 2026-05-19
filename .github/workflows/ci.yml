@@ -253,14 +253,11 @@ jobs:
             playwright-browsers-${{ runner.os }}-
 
       - name: Install Root Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install Webview Dependencies
         working-directory: webview-ui
-        run: npm ci
-
-      - name: Build
-        run: node esbuild.js
+        run: npm install
 
       - name: Build Webview
         working-directory: webview-ui
