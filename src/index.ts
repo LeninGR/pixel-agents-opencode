@@ -7,7 +7,7 @@ import { join } from 'path';
 import { PixelAgentsServer } from './server.js';
 import { StateManager } from './state-manager.js';
 
-const DEFAULT_PORT = 3456;
+const DEFAULT_PORT = 3457;
 
 // ── Palettes ────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,8 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
 
   try {
     server.start();
+    // Verify server is broadcasting
+    server.broadcast({ type: 'init', message: 'Plugin loaded' });
     await ctx.client.app.log({
       body: {
         service: 'pixel-agents',
