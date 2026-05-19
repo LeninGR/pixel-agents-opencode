@@ -50,7 +50,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "build:webview": "cd webview-ui && npm run build",
+    "build:webview": "cd webview-ui && npx vite build --outDir ../dist/web && cd .. && cp dist/webview/assets/asset-index.json dist/web/assets/ 2>/dev/null; cp dist/webview/assets/furniture-catalog.json dist/web/assets/ 2>/dev/null",
     "compile": "npm run check-types && npm run lint && node esbuild.js && npm run build:webview",
     "build": "npm run compile",
     "watch": "npm-run-all -p watch:*",
@@ -70,7 +70,10 @@
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
     "knip": "knip",
-    "build:opencode": "tsup src/index.ts --format esm --dts --out-dir dist"
+    "build:opencode": "tsup src/index.ts --format esm --dts --out-dir dist && cp dist/index.js dist/opencode-plugin.js",
+    "postbuild:webview": "cp dist/web/opencode-bridge.js dist/web/opencode-bridge.js 2>/dev/null; cat > dist/web/opencode-bridge.js << \"BRIDGE\"\n(function(){const WS_URL=(location.protocol===\"https:\"?\"wss:\":\"ws:\")+\"//\"+location.host+\"/ws\";let ws=null,rt=null,nextId=100;const seen=new Set();const NAME_PALETTE={\"gentle-orchestrator\":4};function d(data){window.dispatchEvent(new MessageEvent(\"message\",{data}))}function ensure(n,pn,st){if(seen.has(n))return;seen.add(n);const id=nextId++,pa=NAME_PALETTE[n]??(nextId%6);const label=pn?pn+(st?\" — \"+st:\"\"):n;d({type:\"agentCreated\",id,name:label,folderName:pn||n,palette:pa});d({type:\"agentStatus\",id,status:\"active\"})}function connect(){try{ws=new WebSocket(WS_URL);ws.onopen=()=>{if(rt){clearTimeout(rt);rt=null}};ws.onmessage=(e)=>{try{const m=JSON.parse(e.data);if(m.type===\"agent_spawn\")ensure(m.name||m.id,m.projectName,m.sessionTitle);if(m.type===\"session_event\")ensure(m.agentName||m.sessionID,m.projectName,m.sessionTitle);if(m.type===\"state_update\"&&m.agents)Object.keys(m.agents).forEach(n=>ensure(n))}catch(_){}};ws.onclose=()=>{rt=setTimeout(connect,3000)}}catch(_){rt=setTimeout(connect,3000)}}setTimeout(connect,1000)})();\nBRIDGE",
+    "build:all": "npm run build:opencode && npm run build:webview && npm run build:bridge",
+    "build:bridge": "cp scripts/opencode-bridge.js dist/web/opencode-bridge.js && sed -i \"\" \"s|</body>|<script src=\"/opencode-bridge.js\"></script>\n</body>|\" dist/web/index.html"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
