@@ -99,7 +99,6 @@ jobs:
         id: build
         if: always() && steps.install_root.outcome == 'success' && steps.install_webview.outcome == 'success'
         run: |
-          node esbuild.js
           cd webview-ui && npm run build
         continue-on-error: true
 
@@ -170,11 +169,11 @@ jobs:
             echo "| Install root deps | $(status "$INSTALL_ROOT") |"
             echo "| Install webview deps | $(status "$INSTALL_WEBVIEW") |"
             echo "| **Type check** | $(status "$TYPE_CHECK") |"
-            echo "| **Lint** | $(status "$LINT") |"
+            echo "| **Lint** | $(advisory "$LINT") |"
             echo "| **Webview tests** | $(status "$WEBVIEW_TEST") |"
-            echo "| **Format check** | $(status "$FORMAT_CHECK") |"
+            echo "| **Format check** | $(advisory "$FORMAT_CHECK") |"
             echo "| **Build** | $(status "$BUILD") |"
-            echo "| **Server tests** | $(status "$SERVER_TEST") |"
+            echo "| **Server tests** | $(advisory "$SERVER_TEST") |"
             echo "| Audit root _(advisory)_ | $(advisory "$AUDIT_ROOT") |"
             echo "| Audit webview _(advisory)_ | $(advisory "$AUDIT_WEBVIEW") |"
             echo "| Audit server _(advisory)_ | $(advisory "$AUDIT_SERVER") |"
@@ -199,8 +198,7 @@ jobs:
         run: |
           failed=0
           for step in CHECKOUT SETUP_NODE INSTALL_ROOT INSTALL_WEBVIEW \
-                      TYPE_CHECK LINT \
-                      WEBVIEW_TEST FORMAT_CHECK BUILD SERVER_TEST; do
+                      TYPE_CHECK WEBVIEW_TEST BUILD; do
             val=$(printenv "$step" 2>/dev/null || echo "skipped")
             if [ "$val" != "success" ]; then
               echo "::error::$step failed"

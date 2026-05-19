@@ -1,10 +1,11 @@
 import type { Plugin } from '@opencode-ai/plugin';
 import { tool } from '@opencode-ai/plugin';
-import { StateManager } from './state-manager.js';
+import { writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 import { PixelAgentsServer } from './server.js';
-import { writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { StateManager } from './state-manager.js';
 
 const DEFAULT_PORT = 3456;
 
@@ -49,7 +50,7 @@ function safeAgentName(agent: unknown, fallback: string): string {
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
 const PixelAgentsPlugin: Plugin = async (ctx) => {
-  writeFileSync(join(tmpdir(), "pixel-agents-loaded.txt"), "loaded at " + new Date().toISOString());
+  writeFileSync(join(tmpdir(), 'pixel-agents-loaded.txt'), 'loaded at ' + new Date().toISOString());
   const stateManager = new StateManager();
   const server = new PixelAgentsServer(stateManager, { port: DEFAULT_PORT, host: '127.0.0.1' });
   const sessionAgentMap = new Map<string, string>();
