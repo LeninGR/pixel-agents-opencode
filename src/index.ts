@@ -1,8 +1,12 @@
 import type { Plugin } from '@opencode-ai/plugin';
 import { tool } from '@opencode-ai/plugin';
 import { StateManager } from './state-manager.js';
+import { PixelAgentsServer } from './server.js';
+import { writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
-const SERVER_URL = 'http://127.0.0.1:3456';
+const DEFAULT_PORT = 3456;
 
 // ── Palettes ────────────────────────────────────────────────────────────────
 
@@ -42,37 +46,32 @@ function safeAgentName(agent: unknown, fallback: string): string {
   return fallback;
 }
 
-// ── HTTP broadcast helper ────────────────────────────────────────────────────
-
-async function broadcast(msg: Record<string, unknown>): Promise<void> {
-  try {
-    await fetch(`${SERVER_URL}/api/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(msg),
-    });
-  } catch {
-    // Server might not be running — ignore
-  }
-}
-
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
 const PixelAgentsPlugin: Plugin = async (ctx) => {
+  writeFileSync(join(tmpdir(), "pixel-agents-loaded.txt"), "loaded at " + new Date().toISOString());
   const stateManager = new StateManager();
+  const server = new PixelAgentsServer(stateManager, { port: DEFAULT_PORT, host: '127.0.0.1' });
   const sessionAgentMap = new Map<string, string>();
 
   function getAgentNameForSession(sessionID: string): string {
     return sessionAgentMap.get(sessionID) || sessionID;
   }
 
-  await ctx.client.app.log({
-    body: {
-      service: 'pixel-agents',
-      level: 'info',
-      message: `Pixel Agents relay ready → ${SERVER_URL}`,
-    },
-  });
+  try {
+    server.start();
+    await ctx.client.app.log({
+      body: {
+        service: 'pixel-agents',
+        level: 'info',
+        message: `Pixel Agents running at ${server.url}`,
+      },
+    });
+  } catch (err) {
+    await ctx.client.app.log({
+      body: { service: 'pixel-agents', level: 'error', message: `Failed to start: ${err}` },
+    });
+  }
 
   return {
     tool: {
@@ -81,16 +80,14 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
         args: {},
         async execute() {
           try {
-            await ctx.$`open ${SERVER_URL}`;
+            await ctx.$`open ${server.url}`;
           } catch {
-            await ctx.$`xdg-open ${SERVER_URL}`;
+            await ctx.$`xdg-open ${server.url}`;
           }
-          return `Pixel Agents is running at ${SERVER_URL}`;
+          return `Pixel Agents is running at ${server.url}`;
         },
       }),
     },
-
-    // ── Event hooks ────────────────────────────────────────────────────────
 
     event: async ({ event }) => {
       const isSessionEvent = event.type.startsWith('session.');
@@ -109,8 +106,7 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
             event.type === 'session.idle' ? 'idle' : 'thinking',
             '',
           );
-
-          await broadcast({
+          server.broadcast({
             type: 'session_event',
             eventType: event.type,
             sessionID,
@@ -125,8 +121,7 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
       const agentName = safeAgentName(agent, sessionID);
       sessionAgentMap.set(sessionID, agentName);
       stateManager.setAgentAction(agentName, 'thinking', 'Composing response');
-
-      await broadcast({
+      server.broadcast({
         type: 'agent_spawn',
         id: sessionID,
         name: agentName,
@@ -137,14 +132,7 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     'tool.execute.before': async ({ tool: toolName, sessionID }) => {
       const agentName = getAgentNameForSession(sessionID);
       stateManager.handleToolStart(agentName, toolName);
-
-      await broadcast({
-        type: 'agent_tool',
-        id: sessionID,
-        name: agentName,
-        tool: toolName,
-        action: 'active',
-      });
+      server.broadcast({ type: 'agent_tool', id: sessionID, name: agentName, tool: toolName });
     },
 
     'tool.execute.after': async ({ tool: toolName, sessionID }) => {

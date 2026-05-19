@@ -176,7 +176,14 @@ export function useExtensionMessages(
             ch.agentName = teammateName;
           }
         } else {
-          os.addAgent(id, undefined, undefined, undefined, undefined, folderName);
+          os.addAgent(
+            id,
+            msg.palette as number | undefined,
+            msg.hueShift as number | undefined,
+            undefined,
+            undefined,
+            folderName,
+          );
         }
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
