@@ -17,7 +17,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./dist/extension.js",
+  "main": "dist/plugin.js",
   "contributes": {
     "commands": [
       {
@@ -101,10 +101,10 @@
     "*.{ts,tsx,js,mjs,css,json,md}": "prettier --write",
     "webview-ui/**/*.{ts,tsx,js,css,json}": "prettier --write"
   },
-  "type": "module",
   "dependencies": {
     "@opencode-ai/plugin": "latest",
     "@opencode-ai/sdk": "latest",
     "ws": "^8.20.1"
-  }
+  },
+  "type": "module"
 }
