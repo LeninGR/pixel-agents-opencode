@@ -57,6 +57,18 @@ export class PixelAgentsServer {
           this.sockets.add(ws);
           // Send current state snapshot
           ws.send(JSON.stringify(this.stateManager.getSnapshot()));
+          // DEBUG: send test agent to verify pipeline
+          ws.send(
+            JSON.stringify({
+              type: 'agent_spawn',
+              id: 'debug-session',
+              name: 'gentle-orchestrator',
+              palette: ['#f0c8a0', '#3d2010', '#cc4444', '#2a2a3a'],
+              projectName: 'pixel-agents-opencode',
+              sessionTitle: 'Multi-session test',
+              seatId: 0,
+            }),
+          );
         },
         close: (ws: ServerWebSocket<undefined>) => {
           this.sockets.delete(ws);
