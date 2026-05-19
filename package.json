@@ -17,7 +17,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "dist/plugin.js",
+  "main": "dist/opencode-plugin.js",
   "contributes": {
     "commands": [
       {
