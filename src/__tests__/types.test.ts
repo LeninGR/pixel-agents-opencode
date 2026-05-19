@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { StateUpdate, OpenCodeAgentState, AgentAction } from "../opencode-types.js";
+import type { StateUpdate, OpenCodeAgentState } from "../opencode-types.js";
 
 describe("StateUpdate", () => {
   it("compiles with valid agent states", () => {

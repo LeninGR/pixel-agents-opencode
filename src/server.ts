@@ -1,18 +1,19 @@
-import { resolve, join, extname } from "path";
-import { existsSync, readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import type { Server, ServerWebSocket } from "bun";
-import type { StateManager } from "./state-manager.js";
-import type { ServerConfig, StateUpdate } from "./opencode-types.js";
+import { resolve, join, extname } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import type { Server, ServerWebSocket } from 'bun';
+import type { Serve, WebSocketHandler } from 'bun';
+import type { StateManager } from './state-manager.js';
+import type { ServerConfig, StateUpdate } from './opencode-types.js';
 
 const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
 };
 
 export class PixelAgentsServer {
@@ -24,13 +25,15 @@ export class PixelAgentsServer {
   port: number;
 
   /** Callback for client→server messages (layout_save, layout_load, etc.) */
-  onClientMessage: ((data: Record<string, unknown>, ws: ServerWebSocket<undefined>) => void) | null = null;
+  onClientMessage:
+    | ((data: Record<string, unknown>, ws: ServerWebSocket<undefined>) => void)
+    | null = null;
 
   constructor(stateManager: StateManager, config: ServerConfig) {
     this.stateManager = stateManager;
     this.port = config.port;
-    const __dirname = fileURLToPath(new URL(".", import.meta.url));
-    this.webRoot = resolve(__dirname, "web");
+    const __dirname = fileURLToPath(new URL('.', import.meta.url));
+    this.webRoot = resolve(__dirname, 'web');
   }
 
   start(): void {
@@ -40,30 +43,32 @@ export class PixelAgentsServer {
 
     this.server = Bun.serve({
       port: this.port,
-      hostname: "127.0.0.1",
-      fetch: (req, server) => {
+      hostname: '127.0.0.1',
+      fetch: (req: Request, server: Server) => {
         const url = new URL(req.url);
-        if (url.pathname === "/ws") {
+        if (url.pathname === '/ws') {
           const upgraded = server.upgrade(req);
           if (upgraded) return undefined as unknown as Response;
-          return new Response("WebSocket upgrade failed", { status: 400 });
+          return new Response('WebSocket upgrade failed', { status: 400 });
         }
         return this.serveStatic(url.pathname);
       },
       websocket: {
-        open: (ws) => {
+        open: (ws: ServerWebSocket<undefined>) => {
           this.sockets.add(ws);
           // Send current state snapshot
           ws.send(JSON.stringify(this.stateManager.getSnapshot()));
         },
-        close: (ws) => {
+        close: (ws: ServerWebSocket<undefined>) => {
           this.sockets.delete(ws);
         },
-        message: (ws, raw) => {
+        message: (ws: ServerWebSocket<undefined>, raw: string | Buffer) => {
           try {
             const data = JSON.parse(raw.toString());
             if (this.onClientMessage) this.onClientMessage(data, ws);
-          } catch { /* ignore malformed */ }
+          } catch {
+            /* ignore malformed */
+          }
         },
       },
     });
@@ -87,28 +92,32 @@ export class PixelAgentsServer {
   broadcast(msg: StateUpdate | Record<string, unknown>): void {
     const raw = JSON.stringify(msg);
     for (const ws of this.sockets) {
-      try { ws.send(raw); } catch { /* ignore */ }
+      try {
+        ws.send(raw);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
   private serveStatic(pathname: string): Response {
-    if (pathname === "/") pathname = "/index.html";
-    if (pathname.startsWith("/")) pathname = pathname.slice(1);
+    if (pathname === '/') pathname = '/index.html';
+    if (pathname.startsWith('/')) pathname = pathname.slice(1);
     const filePath = join(this.webRoot, pathname);
     if (!filePath.startsWith(this.webRoot)) {
-      return new Response("Forbidden", { status: 403 });
+      return new Response('Forbidden', { status: 403 });
     }
     if (!existsSync(filePath)) {
-      return new Response("Not Found", { status: 404 });
+      return new Response('Not Found', { status: 404 });
     }
     try {
       const content = readFileSync(filePath);
       const ext = extname(filePath);
       return new Response(content, {
-        headers: { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" },
+        headers: { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' },
       });
     } catch {
-      return new Response("Internal Server Error", { status: 500 });
+      return new Response('Internal Server Error', { status: 500 });
     }
   }
 }
