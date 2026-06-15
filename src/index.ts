@@ -4,23 +4,13 @@ import { writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+import { AGENT_PALETTE_POOL } from './constants.js';
 import { PixelAgentsServer } from './server.js';
 import { StateManager } from './state-manager.js';
 
 const DEFAULT_PORT = 3457;
 
-// ── Palettes ────────────────────────────────────────────────────────────────
-
-const PALETTE_POOL: string[][] = [
-  ['#f0c8a0', '#3d2010', '#cc4444', '#2a2a3a'],
-  ['#d4a574', '#1a1a1a', '#3366aa', '#3a3a2a'],
-  ['#e8c090', '#5a3a1a', '#44aa44', '#2a3040'],
-  ['#c8956c', '#8a6030', '#aa44aa', '#3a2a2a'],
-  ['#f5d0b0', '#c8a030', '#dd8833', '#202840'],
-  ['#b87850', '#0a0a0a', '#eeeeee', '#1a2a1a'],
-  ['#e0b888', '#4a2a3a', '#338888', '#2a2828'],
-  ['#d0a068', '#6a4a2a', '#ffcc00', '#283040'],
-];
+// ── Palettes (from constants) ─────────────────────────────────────────────────
 
 let paletteIndex = 0;
 const sessionPaletteMap = new Map<string, string[]>();
@@ -28,7 +18,7 @@ const sessionPaletteMap = new Map<string, string[]>();
 function paletteForSession(sessionID: string): string[] {
   const existing = sessionPaletteMap.get(sessionID);
   if (existing) return existing;
-  const p = [...PALETTE_POOL[paletteIndex % PALETTE_POOL.length]];
+  const p = [...AGENT_PALETTE_POOL[paletteIndex % AGENT_PALETTE_POOL.length]];
   paletteIndex++;
   sessionPaletteMap.set(sessionID, p);
   return p;
@@ -93,22 +83,73 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
     return sessionSeatCounter++ % 4;
   }
 
+  // Start server (non-blocking)
   try {
     server.start();
-    // Verify server is broadcasting
-    server.broadcast({ type: 'init', message: 'Plugin loaded' });
-    await ctx.client.app.log({
-      body: {
-        service: 'pixel-agents',
-        level: 'info',
-        message: `Pixel Agents running at ${server.url}`,
-      },
-    });
   } catch (err) {
-    await ctx.client.app.log({
-      body: { service: 'pixel-agents', level: 'error', message: `Failed to start: ${err}` },
-    });
+    // Server start failed - will be retried
   }
+
+  // Log after a small delay to not block startup
+  setTimeout(async () => {
+    try {
+      await ctx.client.app.log({
+        body: {
+          service: 'pixel-agents',
+          level: 'info',
+          message: `Pixel Agents running at ${server.url}`,
+        },
+      });
+    } catch {}
+  }, 1000);
+
+  // Detect existing sessions (non-blocking, after delay)
+  // Pre-cache session info so when chat.message arrives, we have project/title ready
+  // Also poll periodically to catch new sub-sessions spawned by sub-agents
+  const knownSubSessionIDs = new Set<string>();
+  const knownRootSessionIDs = new Set<string>();
+
+  async function detectSessions() {
+    try {
+      const sessionsResult = await ctx.client.session.list();
+      const sessions =
+        (
+          sessionsResult as {
+            data?: Array<{ id: string; title?: string; directory?: string; parentID?: string }>;
+          }
+        )?.data || [];
+
+      for (const session of sessions) {
+        const sessionID = session.id;
+        const directory = session.directory || '';
+        const projectName = directory.split('/').filter(Boolean).pop() || directory;
+        const sessionTitle = session.title || sessionID;
+
+        // Always cache session info
+        sessionInfoCache.set(sessionID, { projectName, sessionTitle, directory });
+
+        if (session.parentID) {
+          // Sub-session (created by sub-agent via task tool).
+          // We DO NOT emit subagent_spawn at detection time because the
+          // actual agent name (e.g. "sdd-propose") is not yet known — only
+          // the sessionID. We track the sub-session here and emit the spawn
+          // only when chat.message fires (which has the real agent name).
+          if (!knownSubSessionIDs.has(sessionID)) {
+            knownSubSessionIDs.add(sessionID);
+            sessionAgentMap.set(sessionID, sessionID);
+          }
+        } else {
+          // Root session
+          knownRootSessionIDs.add(sessionID);
+        }
+      }
+    } catch {}
+  }
+
+  // Initial detection
+  setTimeout(detectSessions, 500);
+  // Poll every 3 seconds to catch new sub-sessions
+  setInterval(detectSessions, 3000);
 
   return {
     tool: {
@@ -139,11 +180,16 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
         if (sessionID && typeof sessionID === 'string' && !sessionID.startsWith('msg_')) {
           const agentName = getAgentNameForSession(sessionID);
           const info = await getSessionInfo(sessionID);
-          stateManager.setAgentAction(
-            agentName,
-            event.type === 'session.idle' ? 'idle' : 'thinking',
-            '',
-          );
+          // Filter out zombie sub-sessions (where agentName is the sessionID
+          // because chat.message never fired for them)
+          const isZombieSubagent = agentName.startsWith('ses_');
+          if (!isZombieSubagent) {
+            stateManager.setAgentAction(
+              agentName,
+              event.type === 'session.idle' ? 'idle' : 'thinking',
+              '',
+            );
+          }
           server.broadcast({
             type: 'session_event',
             eventType: event.type,
@@ -164,16 +210,53 @@ const PixelAgentsPlugin: Plugin = async (ctx) => {
       sessionAgentMap.set(sessionID, agentName);
       const info = await getSessionInfo(sessionID);
       stateManager.setAgentAction(agentName, 'thinking', 'Composing response');
-      server.broadcast({
-        type: 'agent_spawn',
-        id: sessionID,
-        name: agentName,
-        palette: paletteForSession(sessionID),
-        projectName: info.projectName,
-        sessionTitle: info.sessionTitle,
-        directory: info.directory,
-        seatId: assignSessionSeat(sessionID),
-      });
+
+      // Check if this is a sub-agent (has a parent session)
+      // We track sub-sessions in knownSubSessionIDs from the polling
+      // but we don't know the parent here directly. We rely on
+      // sessionAgentMap having the sub-session → parent mapping.
+      // For now, check if this session has a parent by looking at the
+      // session via ctx.client.session.get
+      let parentAgent: string | null = null;
+      try {
+        const sessionResult = await ctx.client.session.get({ path: { id: sessionID } });
+        const sessionData = (sessionResult as { data?: { parentID?: string } })?.data;
+        if (sessionData?.parentID) {
+          parentAgent = sessionAgentMap.get(sessionData.parentID) || sessionData.parentID;
+        }
+      } catch {}
+
+      if (parentAgent) {
+        // This is a sub-agent. Emit subagent_spawn with the REAL agent name.
+        // Only emit if the agent name is recognized (filter out sessionID placeholders).
+        if (!agentName.startsWith('ses_')) {
+          const parentPalette = paletteForSession(sessionID);
+          server.broadcast({
+            type: 'subagent_spawn',
+            id: sessionID,
+            parentId: '',
+            parentAgent,
+            palette: parentPalette,
+            projectName: info.projectName,
+            sessionTitle: info.sessionTitle,
+            directory: info.directory,
+            seatId: assignSessionSeat(sessionID),
+            agentName,
+          });
+        }
+      } else {
+        // Root agent (orchestrator)
+        server.broadcast({
+          type: 'agent_spawn',
+          id: sessionID,
+          name: agentName,
+          palette: paletteForSession(sessionID),
+          projectName: info.projectName,
+          sessionTitle: info.sessionTitle,
+          directory: info.directory,
+          seatId: assignSessionSeat(sessionID),
+        });
+      }
     },
 
     'tool.execute.before': async ({ tool: toolName, sessionID }) => {

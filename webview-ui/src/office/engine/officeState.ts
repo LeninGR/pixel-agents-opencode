@@ -442,31 +442,14 @@ export class OfficeState {
     const palette = parentCh ? parentCh.palette : 0;
     const hueShift = parentCh ? parentCh.hueShift : 0;
 
-    // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
+    // Sub-agents STACK on the parent's tile instead of searching for a free
+    // tile. The renderer offsets the sub-agent visually so it appears next to
+    // the parent, not on top. This prevents sub-agents from spawning in distant
+    // walkable tiles (e.g. the lobby or break room) which visually looks like
+    // an "empty office" with one lonely character.
     const parentCol = parentCh ? parentCh.tileCol : 0;
     const parentRow = parentCh ? parentCh.tileRow : 0;
-    const dist = (c: number, r: number) => Math.abs(c - parentCol) + Math.abs(r - parentRow);
-
-    // Build set of tiles occupied by existing characters
-    const occupiedTiles = new Set<string>();
-    for (const [, other] of this.characters) {
-      occupiedTiles.add(`${other.tileCol},${other.tileRow}`);
-    }
-
-    let spawn = { col: parentCol, row: parentRow };
-    if (this.walkableTiles.length > 0) {
-      let closest = this.walkableTiles[0];
-      let closestDist = Infinity;
-      for (const tile of this.walkableTiles) {
-        if (occupiedTiles.has(`${tile.col},${tile.row}`)) continue;
-        const d = dist(tile.col, tile.row);
-        if (d < closestDist) {
-          closest = tile;
-          closestDist = d;
-        }
-      }
-      spawn = closest;
-    }
+    const spawn = { col: parentCol, row: parentRow };
 
     const ch = createCharacter(id, palette, null, null, hueShift);
     ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;

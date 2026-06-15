@@ -21,3 +21,15 @@ export const WORKSPACE_KEY_AGENTS = 'pixel-agents.agents';
 export const WORKSPACE_KEY_AGENT_SEATS = 'pixel-agents.agentSeats';
 export const WORKSPACE_KEY_LAYOUT = 'pixel-agents.layout';
 export const TERMINAL_NAME_PREFIX = 'Claude Code';
+
+// ── Agent Palettes (OpenCode Plugin) ──────────────────────
+export const AGENT_PALETTE_POOL: string[][] = [
+  ['#f0c8a0', '#3d2010', '#cc4444', '#2a2a3a'],
+  ['#d4a574', '#1a1a1a', '#3366aa', '#3a3a2a'],
+  ['#e8c090', '#5a3a1a', '#44aa44', '#2a3040'],
+  ['#c8956c', '#8a6030', '#aa44aa', '#3a2a2a'],
+  ['#f5d0b0', '#c8a030', '#dd8833', '#202840'],
+  ['#b87850', '#0a0a0a', '#eeeeee', '#1a2a1a'],
+  ['#e0b888', '#4a2a3a', '#338888', '#2a2828'],
+  ['#d0a068', '#6a4a2a', '#ffcc00', '#283040'],
+];
