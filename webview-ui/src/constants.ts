@@ -39,6 +39,7 @@ export const MATRIX_TRAIL_DIM_THRESHOLD = 0.66;
 export const CHARACTER_SITTING_OFFSET_PX = 6;
 export const CHARACTER_Z_SORT_OFFSET = 0.5;
 export const OUTLINE_Z_SORT_OFFSET = 0.001;
+export const SUBAGENT_SCALE = 0.6;
 export const SELECTED_OUTLINE_ALPHA = 1.0;
 export const HOVERED_OUTLINE_ALPHA = 0.5;
 export const GHOST_PREVIEW_SPRITE_ALPHA = 0.5;

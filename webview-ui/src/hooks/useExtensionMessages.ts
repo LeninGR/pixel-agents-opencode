@@ -263,7 +263,10 @@ export function useExtensionMessages(
             ],
           };
         });
-        const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
+        const toolName =
+          (msg.toolName as string | undefined) ??
+          (msg.tool as string | undefined) ??
+          extractToolName(status);
         os.setAgentTool(id, toolName);
         os.setAgentActive(id, true);
         // Don't clear the permission bubble if the hook already confirmed permission is needed

@@ -30,6 +30,7 @@ import {
   SELECTED_OUTLINE_ALPHA,
   SELECTION_DASH_PATTERN,
   SELECTION_HIGHLIGHT_COLOR,
+  SUBAGENT_SCALE,
   VOID_TILE_DASH_PATTERN,
   VOID_TILE_OUTLINE_COLOR,
 } from '../../constants.js';
@@ -221,7 +222,14 @@ export function renderScene(
     drawables.push({
       zY: charZY,
       draw: (c) => {
-        c.drawImage(cached, drawX, drawY);
+        if (ch.isSubagent) {
+          const scaledW = cached.width * SUBAGENT_SCALE;
+          const scaledH = cached.height * SUBAGENT_SCALE;
+          const offsetX = (cached.width - scaledW) / 2;
+          c.drawImage(cached, drawX + offsetX, drawY + cached.height - scaledH, scaledW, scaledH);
+        } else {
+          c.drawImage(cached, drawX, drawY);
+        }
       },
     });
   }
