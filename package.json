@@ -17,7 +17,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "dist/plugin-1781569256.js",
+  "main": "dist/plugin-1781570271.js",
   "contributes": {
     "commands": [
       {

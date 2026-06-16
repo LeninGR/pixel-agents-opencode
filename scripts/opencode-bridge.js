@@ -101,8 +101,27 @@
             // Check if this sub-agent session is finished (idle or error)
             const isFinished = m.eventType === 'session.idle' || m.eventType === 'session.error';
 
+            // Debug: log every session_event for sub-sessions
+            if (m.sessionID && m.sessionID.startsWith('ses_')) {
+              console.log(
+                '[subagent] session_event:',
+                m.sessionID.substring(0, 20),
+                'eventType:',
+                m.eventType,
+                'agentName:',
+                agentName,
+                'inToolMap:',
+                !!sessionToolMap[m.sessionID],
+                'inCleaned:',
+                cleanedSessions.has(m.sessionID),
+                'pendingKey:',
+                seen.has(pendingKey),
+              );
+            }
+
             // Cleanup from sessionToolMap for already-created sub-agents
             if (isFinished && m.sessionID && sessionToolMap[m.sessionID]) {
+              console.log('[subagent] CLEANING UP:', m.sessionID.substring(0, 20));
               const entry = sessionToolMap[m.sessionID];
               d({
                 type: 'subagentClear',
@@ -134,6 +153,14 @@
                     toolId,
                     parentId: orchestratorId || 100,
                   };
+                  console.log(
+                    '[subagent] CREATED:',
+                    agentName,
+                    'sessionID:',
+                    m.sessionID.substring(0, 20),
+                    'toolId:',
+                    toolId,
+                  );
                   d({
                     type: 'agentToolStart',
                     id: orchestratorId || 100,
