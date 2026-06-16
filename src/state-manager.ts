@@ -1,6 +1,6 @@
 import {
-  type OpenCodeAgentState,
   type AgentAction,
+  type OpenCodeAgentState,
   type StateUpdate,
   TOOL_ACTION_MAP,
 } from './opencode-types.js';
@@ -24,6 +24,9 @@ export class StateManager {
   }
 
   setAgentAction(name: string, action: AgentAction, detail: string = '', tool?: string): void {
+    // Filter out zombie sub-sessions whose name is the raw sessionID
+    if (name.startsWith('ses_')) return;
+
     const existing = this.agents.get(name);
     if (existing?.action === action && existing?.detail === detail) return;
 

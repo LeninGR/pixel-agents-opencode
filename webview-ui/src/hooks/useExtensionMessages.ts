@@ -121,7 +121,14 @@ export function useExtensionMessages(
       const msg = e.data;
       const os = getOfficeState();
 
-      if (msg.type === 'layoutLoaded') {
+      if (msg.type === 'clearAllAgents') {
+        // Reset all agent state — used by the opencode bridge to clean up
+        // zombie agents from server buffer replays
+        setAgents([]);
+        const os = getOfficeState();
+        os.characters.clear();
+        return;
+      } else if (msg.type === 'layoutLoaded') {
         // Skip external layout updates while editor has unsaved changes
         if (layoutReadyRef.current && isEditDirty?.()) {
           console.log('[Webview] Skipping external layout update — editor has unsaved changes');

@@ -152,9 +152,31 @@ export function renderScene(
     const cached = getCachedSprite(spriteData, zoom);
     // Sitting offset: shift character down when seated so they visually sit in the chair
     const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+    // Sub-agent offset: stack siblings side-by-side so multiple sub-agents
+    // spawned at the same parent tile don't overlap. The offset grows with
+    // the index of the sub-agent among siblings.
+    let subAgentOffsetX = 0;
+    let subAgentOffsetY = 0;
+    if (ch.isSubagent) {
+      // Count how many sub-agents of the same parent already exist to compute index
+      const siblings = characters.filter(
+        (c) =>
+          c.isSubagent &&
+          (c as Character & { parentAgentId?: number }).parentAgentId ===
+            (ch as Character & { parentAgentId?: number }).parentAgentId,
+      );
+      const idx = siblings.indexOf(ch as Character & { isSubagent: boolean });
+      if (idx >= 0) {
+        // 16px horizontal per sibling, alternating up/down
+        subAgentOffsetX = (idx + 1) * 16;
+        subAgentOffsetY = idx % 2 === 0 ? -8 : 8;
+      }
+    }
     // Anchor at bottom-center of character — round to integer device pixels
-    const drawX = Math.round(offsetX + ch.x * zoom - cached.width / 2);
-    const drawY = Math.round(offsetY + (ch.y + sittingOffset) * zoom - cached.height);
+    const drawX = Math.round(offsetX + (ch.x + subAgentOffsetX) * zoom - cached.width / 2);
+    const drawY = Math.round(
+      offsetY + (ch.y + sittingOffset + subAgentOffsetY) * zoom - cached.height,
+    );
 
     // Sort characters by bottom of their tile (not center) so they render
     // in front of same-row furniture (e.g. chairs) but behind furniture
