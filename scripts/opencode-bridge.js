@@ -8,6 +8,8 @@
   let orchestratorId = null;
   // Track sub-agent sessions for cleanup: sessionID → { toolId, parentId }
   const sessionToolMap = {};
+  // Track sessions already cleaned up to prevent re-creation as full agents
+  const cleanedSessions = new Set();
 
   const NAME_PALETTE = {
     'gentle-orchestrator': 4,
@@ -98,6 +100,8 @@
 
             // Check if this sub-agent session is finished (idle or error)
             const isFinished = m.eventType === 'session.idle' || m.eventType === 'session.error';
+
+            // Cleanup from sessionToolMap for already-created sub-agents
             if (isFinished && m.sessionID && sessionToolMap[m.sessionID]) {
               const entry = sessionToolMap[m.sessionID];
               d({
@@ -106,12 +110,15 @@
                 parentToolId: entry.toolId,
               });
               delete sessionToolMap[m.sessionID];
+              cleanedSessions.add(m.sessionID);
             }
 
             if (m.sessionID && seen.has(pendingKey)) {
               seen.delete(pendingKey);
-              // Only render if the name is a recognized sub-agent
-              if (
+              // If the session is already finished, don't create — just skip
+              if (isFinished) {
+                // Sub-agent was detected but already idle/errored — nothing to render
+              } else if (
                 agentName.startsWith('sdd-') ||
                 agentName.startsWith('gentle-sdd-') ||
                 NAME_PALETTE[agentName] !== undefined
@@ -154,6 +161,8 @@
               // If the name is unknown (e.g. still the sessionID), skip rendering
             } else if (!m.sessionID || !seen.has(pendingKey)) {
               // Regular session event (not a sub-session we tracked).
+              // Skip sessions already cleaned up to prevent re-creation.
+              if (m.sessionID && cleanedSessions.has(m.sessionID)) return;
               // Filter zombie sub-sessions (name is raw sessionID like ses_xxx)
               if (agentName.startsWith('ses_')) return;
               ensureAgent(agentName, m.projectName, m.sessionTitle, m.palette);
