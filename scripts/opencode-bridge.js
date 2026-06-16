@@ -135,8 +135,8 @@
               cleanedSessions.add(m.sessionID);
             }
 
-            if (m.sessionID && seen.has(pendingKey)) {
-              seen.delete(pendingKey);
+            if (m.sessionID && (seen.has(pendingKey) || sessionToolMap[m.sessionID])) {
+              if (seen.has(pendingKey)) seen.delete(pendingKey);
               // If the session is already finished, don't create — just skip
               if (isFinished) {
                 // Sub-agent was detected but already idle/errored — nothing to render
