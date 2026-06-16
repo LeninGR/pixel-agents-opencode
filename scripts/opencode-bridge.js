@@ -195,7 +195,15 @@
               ensureAgent(agentName, m.projectName, m.sessionTitle, m.palette);
             }
           } else if (m.type === 'agent_tool') {
-            if (m.id) d({ type: 'agentToolStart', id: m.id, name: m.name, tool: m.tool });
+            if (m.id)
+              d({
+                type: 'agentToolStart',
+                id: m.id,
+                name: m.name,
+                tool: m.tool,
+                toolName: m.tool,
+                status: m.tool || 'working',
+              });
           } else if (m.type === 'state_update' && m.agents) {
             Object.keys(m.agents).forEach((name) => {
               ensureAgent(name, m.agents[name].projectName, m.agents[name].sessionTitle);
