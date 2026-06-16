@@ -79,11 +79,9 @@
             seen.clear();
             clearRoomLabels();
           } else if (m.type === 'agent_spawn') {
-            // Filter out zombie session IDs and sub-agent names
-            // (sub-agents are created by the subagent_spawn flow, not agent_spawn)
+            // Filter out only zombie session IDs
             const agentName2 = m.name || m.id || '';
             if (agentName2.startsWith('ses_')) return;
-            if (agentName2.startsWith('sdd-') || agentName2.startsWith('gentle-sdd-')) return;
             ensureAgent(agentName2, m.projectName, m.sessionTitle, m.palette);
           } else if (m.type === 'subagent_spawn') {
             // Sub-agent: do NOT render yet. Wait for the session_event that
