@@ -206,6 +206,14 @@
               });
           } else if (m.type === 'state_update' && m.agents) {
             Object.keys(m.agents).forEach((name) => {
+              // Sub-agent names are handled by the subagent_spawn → session_event
+              // flow. Don't create them as full agents here.
+              if (
+                name.startsWith('sdd-') ||
+                name.startsWith('gentle-sdd-') ||
+                name.startsWith('ses_')
+              )
+                return;
               ensureAgent(name, m.agents[name].projectName, m.agents[name].sessionTitle);
             });
           }
