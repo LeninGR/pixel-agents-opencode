@@ -6,6 +6,8 @@
   const seen = new Set();
   // Track the orchestrator's agent id so we can emit sub-agent events with the right parent
   let orchestratorId = null;
+  // Track sub-agent sessions for cleanup: sessionID → { toolId, parentId }
+  const sessionToolMap = {};
 
   const NAME_PALETTE = {
     'gentle-orchestrator': 4,
@@ -93,6 +95,19 @@
             // it doesn't create a new office.
             const agentName = m.agentName || m.sessionID;
             const pendingKey = 'pending-' + (m.sessionID || '').substring(0, 8);
+
+            // Check if this sub-agent session is finished (idle or error)
+            const isFinished = m.eventType === 'session.idle' || m.eventType === 'session.error';
+            if (isFinished && m.sessionID && sessionToolMap[m.sessionID]) {
+              const entry = sessionToolMap[m.sessionID];
+              d({
+                type: 'subagentClear',
+                id: entry.parentId,
+                parentToolId: entry.toolId,
+              });
+              delete sessionToolMap[m.sessionID];
+            }
+
             if (m.sessionID && seen.has(pendingKey)) {
               seen.delete(pendingKey);
               // Only render if the name is a recognized sub-agent
@@ -107,6 +122,11 @@
                   // so the webview's existing sub-agent flow creates the sub-agent
                   // in the SAME office as the parent.
                   const toolId = `task-${m.sessionID.substring(0, 8)}`;
+                  // Track session → tool mapping for later cleanup
+                  sessionToolMap[m.sessionID] = {
+                    toolId,
+                    parentId: orchestratorId || 100,
+                  };
                   d({
                     type: 'agentToolStart',
                     id: orchestratorId || 100,
