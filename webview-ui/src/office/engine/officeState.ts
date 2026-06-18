@@ -232,6 +232,22 @@ export class OfficeState {
     return null;
   }
 
+  /** Find the unassigned seat closest to (col, row). Returns the seat object. */
+  private findClosestFreeSeat(col: number, row: number): Seat | null {
+    let closest: Seat | null = null;
+    let closestDist = Infinity;
+    for (const seat of this.seats.values()) {
+      if (seat.assigned) continue;
+      const d = Math.abs(seat.seatCol - col) + Math.abs(seat.seatRow - row);
+      if (d < closestDist) {
+        closest = seat;
+        closestDist = d;
+      }
+    }
+    if (closest) closest.assigned = true;
+    return closest;
+  }
+
   /**
    * Pick a diverse palette for a new agent based on currently active agents.
    * First 6 agents each get a unique skin (random order). Beyond 6, skins
@@ -445,20 +461,22 @@ export class OfficeState {
     const palette = pick.palette;
     const hueShift = pick.hueShift;
 
-    // Sub-agents STACK on the parent's tile instead of searching for a free
-    // tile. The renderer offsets the sub-agent visually so it appears next to
-    // the parent, not on top. This prevents sub-agents from spawning in distant
-    // walkable tiles (e.g. the lobby or break room) which visually looks like
-    // an "empty office" with one lonely character.
+    // Sub-agents sit at the NEAREST FREE SEAT to the parent. This makes them
+    // appear as proper characters working at desks instead of stacking on top
+    // of the parent character.
     const parentCol = parentCh ? parentCh.tileCol : 0;
     const parentRow = parentCh ? parentCh.tileRow : 0;
-    const spawn = { col: parentCol, row: parentRow };
 
-    const ch = createCharacter(id, palette, null, null, hueShift);
-    ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
-    ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
-    ch.tileCol = spawn.col;
-    ch.tileRow = spawn.row;
+    // Find closest free seat to parent
+    const seat = this.findClosestFreeSeat(parentCol, parentRow);
+    const seatCol = seat ? seat.seatCol : parentCol;
+    const seatRow = seat ? seat.seatRow : parentRow;
+
+    const ch = createCharacter(id, palette, seat ? seat.uid : null, seat, hueShift);
+    ch.x = seatCol * TILE_SIZE + TILE_SIZE / 2;
+    ch.y = seatRow * TILE_SIZE + TILE_SIZE / 2;
+    ch.tileCol = seatCol;
+    ch.tileRow = seatRow;
     // Face the same direction as the parent agent
     if (parentCh) ch.dir = parentCh.dir;
     ch.isSubagent = true;
