@@ -477,8 +477,8 @@ export class OfficeState {
     ch.y = seatRow * TILE_SIZE + TILE_SIZE / 2;
     ch.tileCol = seatCol;
     ch.tileRow = seatRow;
-    // Face the same direction as the parent agent
-    if (parentCh) ch.dir = parentCh.dir;
+    // Don't override the seat's facingDir — it points toward the desk
+    // (so the sub-agent faces the monitor/work surface, not the parent)
     ch.isSubagent = true;
     ch.parentAgentId = parentAgentId;
     ch.matrixEffect = 'spawn';

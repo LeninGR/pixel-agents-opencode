@@ -181,8 +181,11 @@
                 d({
                   type: 'subagentToolStart',
                   id: orchestratorId || 100,
+                  parentToolId: toolId,
                   parentId: m.sessionID,
                   parentAgent: 'gentle-orchestrator',
+                  tool: 'Read', // sub-agent is doing "Read"-like work
+                  status: `Subtask: ${agentName}`,
                   name: agentName,
                   displayName: agentName,
                   folderName: m.projectName || agentName,
