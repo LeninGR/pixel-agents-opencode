@@ -77,26 +77,43 @@
             seen.clear();
             clearRoomLabels();
           } else if (m.type === 'agent_spawn') {
-            // Filter out zombie session IDs and sub-agent names.
-            // Sub-agents are created by the subagent_spawn → agentToolStart
-            // flow (via os.addSubagent which assigns the nearest free seat).
+            // Filter out zombie session IDs. Sub-agents are created via
+            // agent_spawn too, and they go through the same addAgent flow
+            // as the orchestrator (the plugin assigns a seatId via
+            // assignSessionSeat()).
             const agentName2 = m.name || m.id || '';
             if (agentName2.startsWith('ses_')) return;
-            if (agentName2.startsWith('sdd-') || agentName2.startsWith('gentle-sdd-')) return;
-            // Skip if the same orchestrator is being broadcast again
-            // (e.g. on WebSocket replay). The webview already has it.
+            // Dedupe: skip if the same name is already in seen
             if (seen.has(agentName2)) return;
             ensureAgent(agentName2, m.projectName, m.sessionTitle, m.palette);
           } else if (m.type === 'subagent_spawn') {
-            // Sub-agent: do NOT render yet. Wait for the session_event that
-            // contains the real agentName (e.g. "sdd-propose"). Only render
-            // if the real name is a recognized sub-agent.
-            // Track the sub-session for later matching
-            seen.add('pending-' + (m.id || '').substring(0, 8));
-            // If we previously rendered a subagent for this session (e.g. with
-            // a placeholder name), tell the webview to remove it. The real
-            // name will replace it when session_event arrives.
-            d({ type: 'subagentRemove', sessionID: m.id });
+            // Sub-agent: render immediately as a sub-agent of the parent.
+            // We don't wait for session_event — the plugin already knows the
+            // agentName at this point and includes it in the broadcast.
+            const subName = m.agentName || m.name;
+            if (!subName) return;
+            if (
+              !subName.startsWith('sdd-') &&
+              !subName.startsWith('gentle-sdd-') &&
+              NAME_PALETTE[subName] === undefined
+            )
+              return;
+            if (seen.has(subName)) return;
+            seen.add(subName);
+            const subId = nextId++;
+            const p = m.palette ?? NAME_PALETTE[subName] ?? 0;
+            d({
+              type: 'agentCreated',
+              id: subId,
+              name: subName,
+              folderName: m.projectName || subName,
+              palette: p,
+              isSubagent: true,
+            });
+            d({ type: 'agentStatus', id: subId, status: 'active' });
+            // Track for cleanup
+            const toolId = `task-${(m.id || '').substring(0, 8)}`;
+            sessionToolMap[m.id] = { toolId, parentId: subId };
           } else if (m.type === 'session_event') {
             // Session event has the real agent name (e.g. "sdd-propose").
             // If this is a sub-session that has a pending entry, render it
