@@ -58,7 +58,6 @@
     if (projectName) createRoomLabel(projectName, sessionTitle);
   }
 
-  let hasReloaded = false;
   function connect() {
     try {
       // Reset state on every connection
@@ -69,15 +68,6 @@
         if (rt) {
           clearTimeout(rt);
           rt = null;
-        }
-        // Force a hard reload on first connection after page load.
-        // This ensures React state is fresh and any zombies from previous
-        // server buffer replays are cleared.
-        if (!hasReloaded) {
-          hasReloaded = true;
-          setTimeout(() => {
-            if (window.location) window.location.reload();
-          }, 200);
         }
       };
       ws.onmessage = (e) => {
@@ -93,6 +83,9 @@
             const agentName2 = m.name || m.id || '';
             if (agentName2.startsWith('ses_')) return;
             if (agentName2.startsWith('sdd-') || agentName2.startsWith('gentle-sdd-')) return;
+            // Skip if the same orchestrator is being broadcast again
+            // (e.g. on WebSocket replay). The webview already has it.
+            if (seen.has(agentName2)) return;
             ensureAgent(agentName2, m.projectName, m.sessionTitle, m.palette);
           } else if (m.type === 'subagent_spawn') {
             // Sub-agent: do NOT render yet. Wait for the session_event that
