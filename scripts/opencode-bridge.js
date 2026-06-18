@@ -99,6 +99,10 @@
               NAME_PALETTE[subName] === undefined
             )
               return;
+            // Skip if this is the orchestrator itself (some plugin builds
+            // emit subagent_spawn for root sessions). The orchestrator is
+            // created via agent_spawn separately.
+            if (subName === m.parentAgent) return;
             // Track for cleanup
             const toolId = `task-${(m.id || '').substring(0, 8)}`;
             // Use the orchestrator's id if known — the webview needs the
