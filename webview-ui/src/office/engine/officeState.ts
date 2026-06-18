@@ -494,11 +494,16 @@ export class OfficeState {
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    // Sub-agents get their own distinct palette (not inherited from parent)
-    // so they're visually distinguishable as different characters.
-    const pick = this.pickDiversePalette();
-    const palette = pick.palette;
-    const hueShift = pick.hueShift;
+    // Sub-agents get a deterministic palette based on the parentToolId
+    // hash so the same sub-agent always uses the same colors across
+    // re-renders. The hash is the only consistent key we have at this point.
+    const paletteCount = getLoadedCharacterCount();
+    const hash = Array.from(parentToolId).reduce(
+      (h, c) => (h * 31 + c.charCodeAt(0)) & 0x7fffffff,
+      0,
+    );
+    const palette = (hash + 1) % Math.max(paletteCount, 1);
+    const hueShift = 0;
 
     // Sub-agents sit at the NEAREST FREE SEAT to the parent. This makes them
     // appear as proper characters working at desks instead of stacking on top
