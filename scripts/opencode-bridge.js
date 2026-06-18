@@ -79,9 +79,12 @@
             seen.clear();
             clearRoomLabels();
           } else if (m.type === 'agent_spawn') {
-            // Filter out only zombie session IDs
+            // Filter out zombie session IDs and sub-agent names.
+            // Sub-agents are created by the subagent_spawn → agentToolStart
+            // flow (via os.addSubagent which assigns the nearest free seat).
             const agentName2 = m.name || m.id || '';
             if (agentName2.startsWith('ses_')) return;
+            if (agentName2.startsWith('sdd-') || agentName2.startsWith('gentle-sdd-')) return;
             ensureAgent(agentName2, m.projectName, m.sessionTitle, m.palette);
           } else if (m.type === 'subagent_spawn') {
             // Sub-agent: do NOT render yet. Wait for the session_event that
