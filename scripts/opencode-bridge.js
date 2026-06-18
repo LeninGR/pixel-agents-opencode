@@ -87,9 +87,10 @@
             if (seen.has(agentName2)) return;
             ensureAgent(agentName2, m.projectName, m.sessionTitle, m.palette);
           } else if (m.type === 'subagent_spawn') {
-            // Sub-agent: render immediately as a sub-agent of the parent.
-            // We don't wait for session_event — the plugin already knows the
-            // agentName at this point and includes it in the broadcast.
+            // Sub-agent: emit subagentToolStart so the webview creates it
+            // via os.addSubagent (existing flow, no isSubagent field needed).
+            // The webview will use the parent agent's ID and toolId to look
+            // up the sub-agent slot.
             const subName = m.agentName || m.name;
             if (!subName) return;
             if (
@@ -98,22 +99,21 @@
               NAME_PALETTE[subName] === undefined
             )
               return;
-            if (seen.has(subName)) return;
-            seen.add(subName);
-            const subId = nextId++;
-            const p = m.palette ?? NAME_PALETTE[subName] ?? 0;
-            d({
-              type: 'agentCreated',
-              id: subId,
-              name: subName,
-              folderName: m.projectName || subName,
-              palette: p,
-              isSubagent: true,
-            });
-            d({ type: 'agentStatus', id: subId, status: 'active' });
             // Track for cleanup
             const toolId = `task-${(m.id || '').substring(0, 8)}`;
-            sessionToolMap[m.id] = { toolId, parentId: subId };
+            // Use the orchestrator's id if known — the webview needs the
+            // parent's id to look up the sub-agent
+            sessionToolMap[m.id] = { toolId, parentId: orchestratorId || 100 };
+            // Emit the tool start so os.addSubagent is called in the webview
+            d({
+              type: 'agentToolStart',
+              id: orchestratorId || 100,
+              name: 'gentle-orchestrator',
+              toolName: 'Task',
+              toolId,
+              status: `Subtask: ${subName}`,
+              runInBackground: false,
+            });
           } else if (m.type === 'session_event') {
             // Session event has the real agent name (e.g. "sdd-propose").
             // If this is a sub-session that has a pending entry, render it
