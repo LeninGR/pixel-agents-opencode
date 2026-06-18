@@ -232,12 +232,51 @@ export class OfficeState {
     return null;
   }
 
-  /** Find the unassigned seat closest to (col, row). Returns the seat object. */
+  /** Find the unassigned WORK seat closest to (col, row). Returns the seat object. */
   private findClosestFreeSeat(col: number, row: number): Seat | null {
+    // Same electronics-tiles logic as findFreeSeat — only consider seats
+    // that face a desk (work seats), not break-room / lobby seats.
+    const electronicsTiles = new Set<string>();
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type);
+      if (!entry || entry.category !== 'electronics') continue;
+      for (let dr = 0; dr < entry.footprintH; dr++) {
+        for (let dc = 0; dc < entry.footprintW; dc++) {
+          electronicsTiles.add(`${item.col + dc},${item.row + dr}`);
+        }
+      }
+    }
+
+    const isWorkSeat = (seat: Seat): boolean => {
+      const dCol =
+        seat.facingDir === Direction.RIGHT ? 1 : seat.facingDir === Direction.LEFT ? -1 : 0;
+      const dRow = seat.facingDir === Direction.DOWN ? 1 : seat.facingDir === Direction.UP ? -1 : 0;
+      for (let d = 1; d <= AUTO_ON_FACING_DEPTH; d++) {
+        const tileCol = seat.seatCol + dCol * d;
+        const tileRow = seat.seatRow + dRow * d;
+        if (electronicsTiles.has(`${tileCol},${tileRow}`)) return true;
+        if (dCol !== 0) {
+          if (
+            electronicsTiles.has(`${tileCol},${tileRow - 1}`) ||
+            electronicsTiles.has(`${tileCol},${tileRow + 1}`)
+          )
+            return true;
+        } else {
+          if (
+            electronicsTiles.has(`${tileCol - 1},${tileRow}`) ||
+            electronicsTiles.has(`${tileCol + 1},${tileRow}`)
+          )
+            return true;
+        }
+      }
+      return false;
+    };
+
     let closest: Seat | null = null;
     let closestDist = Infinity;
     for (const seat of this.seats.values()) {
       if (seat.assigned) continue;
+      if (!isWorkSeat(seat)) continue;
       const d = Math.abs(seat.seatCol - col) + Math.abs(seat.seatRow - row);
       if (d < closestDist) {
         closest = seat;
