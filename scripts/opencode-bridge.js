@@ -58,18 +58,26 @@
     if (projectName) createRoomLabel(projectName, sessionTitle);
   }
 
+  let hasReloaded = false;
   function connect() {
     try {
-      // Reset bridge state on every new connection
+      // Reset state on every connection
       seen.clear();
       clearRoomLabels();
-      // Tell the webview to clear its agent state (handles zombies from server buffer)
-      d({ type: 'clearAllAgents' });
       ws = new WebSocket(WS_URL);
       ws.onopen = () => {
         if (rt) {
           clearTimeout(rt);
           rt = null;
+        }
+        // Force a hard reload on first connection after page load.
+        // This ensures React state is fresh and any zombies from previous
+        // server buffer replays are cleared.
+        if (!hasReloaded) {
+          hasReloaded = true;
+          setTimeout(() => {
+            if (window.location) window.location.reload();
+          }, 200);
         }
       };
       ws.onmessage = (e) => {
