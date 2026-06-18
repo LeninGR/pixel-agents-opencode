@@ -439,8 +439,11 @@ export class OfficeState {
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    const palette = parentCh ? parentCh.palette : 0;
-    const hueShift = parentCh ? parentCh.hueShift : 0;
+    // Sub-agents get their own distinct palette (not inherited from parent)
+    // so they're visually distinguishable as different characters.
+    const pick = this.pickDiversePalette();
+    const palette = pick.palette;
+    const hueShift = pick.hueShift;
 
     // Sub-agents STACK on the parent's tile instead of searching for a free
     // tile. The renderer offsets the sub-agent visually so it appears next to
